@@ -1,0 +1,81 @@
+# ~/.inputrc - Readline configuration
+
+# Case-insensitive tab completion
+set completion-ignore-case on
+
+# Treat hyphens and underscores as equivalent for completion
+set completion-map-case on
+
+# Show all completions on first tab (instead of beeping)
+set show-all-if-ambiguous on
+
+# Show all completions if there are multiple matches
+set show-all-if-unmodified on
+
+# Color completions by file type (like ls)
+set colored-stats on
+
+# Color the common prefix of completions
+set colored-completion-prefix on
+
+# Append slash to completed directory names
+set mark-directories on
+set mark-symlinked-directories on
+
+# Show file type indicators in completion listing
+set visible-stats on
+
+# Don't expand ~ to home directory when completing
+set expand-tilde off
+
+# Be more intelligent when autocompleting in the middle of a word
+set skip-completed-text on
+
+# Don't ring bell on completion
+set bell-style none
+
+# Enable 8-bit input (for international characters)
+set input-meta on
+set output-meta on
+set convert-meta off
+
+# ==============================================================================
+# Key Bindings
+# ==============================================================================
+
+# Use Up/Down arrows to search history based on what's already typed
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+# Same for Page Up/Down
+"\e[5~": history-search-backward
+"\e[6~": history-search-forward
+
+# Ctrl+Left/Right for word navigation
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
+
+# Alt+Left/Right for word navigation (alternative)
+"\e[1;3C": forward-word
+"\e[1;3D": backward-word
+
+# Ctrl+Backspace to delete previous word
+"\C-h": backward-kill-word
+
+# Ctrl+Delete to delete next word
+"\e[3;5~": kill-word
+
+# Alt+. to insert last argument of previous command
+"\e.": yank-last-arg
+
+# Ctrl+x Ctrl+e to edit current command in $EDITOR
+"\C-x\C-e": edit-and-execute-command
+
+# ==============================================================================
+# Mode-specific settings (for vi mode users, uncomment below)
+# ==============================================================================
+
+# set editing-mode vi
+# set show-mode-in-prompt on
+# set vi-cmd-mode-string "\1\e[2 q\2"
+# set vi-ins-mode-string "\1\e[6 q\2"

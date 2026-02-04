@@ -1,0 +1,71 @@
+# EditorConfig - https://editorconfig.org
+# Helps maintain consistent coding styles across different editors
+
+root = true
+
+# Default settings for all files
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# JavaScript, TypeScript, JSON, CSS, HTML
+[*.{js,jsx,ts,tsx,json,css,scss,sass,less,html,vue,svelte}]
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
+# Markdown - preserve trailing whitespace for line breaks
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab
+
+[*.mk]
+indent_style = tab
+
+# Shell scripts
+[*.{sh,bash,zsh}]
+indent_size = 4
+
+# Python
+[*.py]
+indent_size = 4
+
+# C/C++
+[*.{c,h,cpp,hpp,cc,cxx}]
+indent_size = 4
+
+# Rust
+[*.rs]
+indent_size = 4
+
+# Go uses tabs
+[*.go]
+indent_style = tab
+
+# Configuration files
+[*.{ini,cfg,conf}]
+indent_size = 4
+
+[*.toml]
+indent_size = 2
+
+# XML-like files
+[*.{xml,xsl,xslt,svg}]
+indent_size = 2
+
+# Docker
+[Dockerfile*]
+indent_size = 4
+
+# Git
+[.git*]
+indent_size = 4
