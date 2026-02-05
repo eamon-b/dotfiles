@@ -1,0 +1,39 @@
+[global_config]
+  title_transmit_fg_color = "#cdd6f4"
+  title_transmit_bg_color = "#1e1e2e"
+  title_receive_fg_color = "#cdd6f4"
+  title_receive_bg_color = "#313244"
+  title_inactive_fg_color = "#6c7086"
+  title_inactive_bg_color = "#11111b"
+  title_use_system_font = False
+  title_font = Monospace 10
+
+[keybindings]
+  next_tab = <Ctrl>Tab
+  prev_tab = <Ctrl><Shift>Tab
+[profiles]
+  [[default]]
+    background_darkness = 0.95
+    background_type = transparent
+    cursor_color = "#f5e0dc"
+    font = Monospace 11
+    foreground_color = "#cdd6f4"
+    show_titlebar = True
+    scrollback_lines = 10000
+    palette = "#45475a:#f38ba8:#a6e3a1:#f9e2af:#89b4fa:#f5c2e7:#94e2d5:#bac2de:#585b70:#f38ba8:#a6e3a1:#f9e2af:#89b4fa:#f5c2e7:#94e2d5:#a6adc8"
+    background_color = "#1e1e2e"
+    use_system_font = False
+    # Show running command in title
+    title_hide_sizetext = True
+
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+      profile = default
+
+[plugins]

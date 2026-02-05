@@ -96,8 +96,7 @@ reset_title_to_dir() {
     set_title "${PWD/#$HOME/~}"
 }
 
-# Enable command-in-title feature
-trap 'show_command_in_title' DEBUG
+# Reset title to directory in PROMPT_COMMAND (trap is set at end of file)
 PROMPT_COMMAND="reset_title_to_dir; ${PROMPT_COMMAND}"
 
 # ==============================================================================
@@ -109,17 +108,6 @@ shopt -s cdspell        # Autocorrect minor cd typos
 shopt -s dirspell       # Autocorrect directory spelling during completion
 shopt -s globstar       # Enable ** for recursive globbing
 shopt -s nocaseglob     # Case-insensitive globbing
-
-# ==============================================================================
-# ls Aliases
-# ==============================================================================
-
-alias ls='ls --color=auto'
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
-alias lt='ls -alFt'          # Sort by time
-alias lS='ls -alFS'          # Sort by size
 
 # ==============================================================================
 # General Aliases
@@ -202,28 +190,28 @@ alias pdown='podman-compose down'
 alias prestart='podman-compose restart'
 
 # ==============================================================================
-# Python Development
+# Python Development (uv)
 # ==============================================================================
 
 export PYTHONDONTWRITEBYTECODE=1  # No .pyc files
 export PYTHONUNBUFFERED=1         # Unbuffered output
 
 alias py='python3'
-alias pip='python3 -m pip'
-alias venv='python3 -m venv'
-alias activate='source venv/bin/activate'
+alias pip='uv pip'
+alias activate='source .venv/bin/activate'
+
+# uv aliases
+alias uvr='uv run'
+alias uva='uv add'
+alias uvad='uv add --dev'
+alias uvs='uv sync'
+alias uvl='uv lock'
+alias uvi='uv init'
 
 # Quick venv creation and activation
 mkvenv() {
-    python3 -m venv "${1:-venv}" && source "${1:-venv}/bin/activate"
+    uv venv "${1:-.venv}" && source "${1:-.venv}/bin/activate"
 }
-
-# pyenv (if installed)
-if [[ -d "$HOME/.pyenv" ]]; then
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-fi
 
 # ==============================================================================
 # Node/JavaScript Development
@@ -332,12 +320,18 @@ if command -v bat &>/dev/null; then
     export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 fi
 
-# eza as ls replacement
+# eza as ls replacement (with fallbacks)
 if command -v eza &>/dev/null; then
     alias ls='eza --color=auto --group-directories-first'
-    alias ll='eza -la --group-directories-first --git'
+    alias ll='eza -l --group-directories-first --git'
+    alias la='eza -a --group-directories-first'
     alias lt='eza -la --sort=modified'
     alias tree='eza --tree'
+else
+    alias ls='ls --color=auto'
+    alias ll='ls -alF'
+    alias la='ls -A'
+    alias lt='ls -alFt'
 fi
 
 # ripgrep
@@ -416,3 +410,7 @@ if [[ -f ~/.bashrc.local ]]; then
 fi
 
 . "$HOME/.local/share/../bin/env"
+
+# Enable command-in-title feature (must be at end of bashrc to avoid
+# firing during initialization, which causes stray characters in prompt)
+trap 'show_command_in_title' DEBUG
