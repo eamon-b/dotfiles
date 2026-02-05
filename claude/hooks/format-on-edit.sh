@@ -31,6 +31,14 @@ if [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]]; then
     exit 0
 fi
 
+# Early exit for unsupported file types (avoids unnecessary config parsing)
+# Add new extensions here as formatters are added
+SUPPORTED_EXTENSIONS="py|pyi|js|jsx|ts|tsx|mjs|cjs|json|jsonc"
+EXT_CHECK="${FILE_PATH##*.}"
+if [[ ! "$EXT_CHECK" =~ ^($SUPPORTED_EXTENSIONS)$ ]]; then
+    exit 0
+fi
+
 log "Processing: $FILE_PATH"
 
 # Check if config exists

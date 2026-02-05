@@ -323,15 +323,15 @@ fi
 # eza as ls replacement (with fallbacks)
 if command -v eza &>/dev/null; then
     alias ls='eza --color=auto --group-directories-first'
-    alias ll='eza -l --group-directories-first --git'
-    alias la='eza -a --group-directories-first'
-    alias lt='eza -la --sort=modified'
+    alias ll='eza -lh --group-directories-first --git'
+    alias la='eza -ah --group-directories-first'
+    alias lt='eza -lah --sort=modified'
     alias tree='eza --tree'
 else
     alias ls='ls --color=auto'
-    alias ll='ls -alF'
-    alias la='ls -A'
-    alias lt='ls -alFt'
+    alias ll='ls -lFh'
+    alias la='ls -Ah'
+    alias lt='ls -alFth'
 fi
 
 # ripgrep
@@ -410,6 +410,18 @@ if [[ -f ~/.bashrc.local ]]; then
 fi
 
 . "$HOME/.local/share/../bin/env"
+
+# ==============================================================================
+# Claude Code Window ID Capture
+# ==============================================================================
+
+# Wrapper to capture the current terminal window ID before launching Claude.
+# This ensures notification hooks can focus the correct terminal even when
+# multiple terminals are running Claude.
+claude() {
+    export CLAUDE_TERMINAL_WINDOW="${WINDOWID:-$(xdotool getactivewindow 2>/dev/null)}"
+    command claude "$@"
+}
 
 # Enable command-in-title feature (must be at end of bashrc to avoid
 # firing during initialization, which causes stray characters in prompt)

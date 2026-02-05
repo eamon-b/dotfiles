@@ -13,13 +13,20 @@ PROJECT_NAME=$(basename "$PWD")
 
 # Find the exact terminal window that spawned this hook
 get_parent_terminal_window() {
-    # Method 1: Use WINDOWID if available (most reliable, set by X11 terminals)
+    # Method 1: Use CLAUDE_TERMINAL_WINDOW (set by wrapper function in bashrc)
+    # This is the most reliable because it captures window ID at Claude launch time
+    if [ -n "$CLAUDE_TERMINAL_WINDOW" ]; then
+        echo "$CLAUDE_TERMINAL_WINDOW"
+        return
+    fi
+
+    # Method 2: Use WINDOWID if available (may not be inherited through to hooks)
     if [ -n "$WINDOWID" ]; then
         echo "$WINDOWID"
         return
     fi
 
-    # Method 2: Walk up the process tree to find the parent Terminator process
+    # Method 3: Walk up the process tree to find the parent Terminator process
     local pid=$$
     local terminator_pid=""
 
@@ -52,7 +59,7 @@ get_parent_terminal_window() {
         fi
     fi
 
-    # Method 3: Fall back to searching by title (least reliable with multiple terminals)
+    # Method 4: Fall back to searching by title (least reliable with multiple terminals)
     local win
     win=$(xdotool search --name "claude" --class "Terminator" 2>/dev/null | head -1)
     if [ -z "$win" ]; then
