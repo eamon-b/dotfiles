@@ -1,4 +1,30 @@
 {
+  "allowedPrompts": [
+    {"tool": "Bash", "prompt": "git status"},
+    {"tool": "Bash", "prompt": "git log"},
+    {"tool": "Bash", "prompt": "git diff"},
+    {"tool": "Bash", "prompt": "git show"},
+    {"tool": "Bash", "prompt": "git branch"},
+    {"tool": "Bash", "prompt": "git remote"},
+    {"tool": "Bash", "prompt": "git stash list"},
+    {"tool": "Bash", "prompt": "git rev-parse"},
+    {"tool": "Bash", "prompt": "git describe"},
+    {"tool": "Bash", "prompt": "git ls-files"},
+    {"tool": "Bash", "prompt": "git blame"},
+    {"tool": "Bash", "prompt": "run tests"},
+    {"tool": "Bash", "prompt": "run linter"},
+    {"tool": "Bash", "prompt": "run type checker"},
+    {"tool": "Bash", "prompt": "run formatter"},
+    {"tool": "Bash", "prompt": "build project"},
+    {"tool": "Bash", "prompt": "check versions"},
+    {"tool": "Bash", "prompt": "list dependencies"},
+    {"tool": "Bash", "prompt": "list directory contents"},
+    {"tool": "Bash", "prompt": "show current directory"},
+    {"tool": "Bash", "prompt": "show environment variables"},
+    {"tool": "Bash", "prompt": "show disk usage"},
+    {"tool": "Bash", "prompt": "show file info"},
+    {"tool": "Bash", "prompt": "show command location"}
+  ],
   "hooks": {
     "PostToolUse": [
       {

@@ -55,6 +55,11 @@ Do not add tests, documentation, or features - only review what was implemented.
 
 # Launch the review agent in background
 # Using --print to make it non-interactive, output goes to terminal
-cd "$WORK_DIR" && claude --print "$REVIEW_PROMPT" &
+# Pass through --dangerously-skip-permissions if the parent session had it
+if [[ "$CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS" == "1" ]]; then
+    cd "$WORK_DIR" && claude --dangerously-skip-permissions --print "$REVIEW_PROMPT" &
+else
+    cd "$WORK_DIR" && claude --print "$REVIEW_PROMPT" &
+fi
 
 exit 0
