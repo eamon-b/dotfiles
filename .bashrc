@@ -114,7 +114,6 @@ shopt -s nocaseglob     # Case-insensitive globbing
 # ==============================================================================
 
 # Safety nets
-alias rm='rm -i'
 alias cp='cp -i'
 alias mv='mv -i'
 
@@ -410,6 +409,13 @@ if [[ -f ~/.bashrc.local ]]; then
 fi
 
 . "$HOME/.local/share/../bin/env"
+
+# Android emulator environment varibales
+export ANDROID_AVD_HOME="/mnt/data/Android/avd"
+export ANDROID_HOME=/mnt/data/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/emulator
 
 # ==============================================================================
 # Claude Code Window ID Capture
