@@ -418,14 +418,14 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 export PATH=$PATH:$ANDROID_HOME/emulator
 
 # ==============================================================================
-# Claude Code Window ID Capture
+# Claude Code Terminal Capture
 # ==============================================================================
 
-# Wrapper to capture the current terminal window ID before launching Claude.
-# This ensures notification hooks can focus the correct terminal even when
-# multiple terminals are running Claude.
+# Wrapper to capture the current TTY before launching Claude.
+# Hooks use CLAUDE_TTY to send OSC 99 notifications back to the correct
+# kitty window, enabling native click-to-focus.
 claude() {
-    export CLAUDE_TERMINAL_WINDOW="${WINDOWID:-$(xdotool getactivewindow 2>/dev/null)}"
+    export CLAUDE_TTY="$(tty)"
     command claude "$@"
 }
 

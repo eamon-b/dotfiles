@@ -18,6 +18,7 @@ declare -A FILES=(
     [".inputrc"]="$HOME/.inputrc"
     [".vimrc"]="$HOME/.vimrc"
     ["terminator_config"]="$HOME/.config/terminator/config"
+    ["kitty.conf"]="$HOME/.config/kitty/kitty.conf"
 )
 
 # Directories to install (source -> destination)

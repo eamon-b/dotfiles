@@ -2,77 +2,55 @@
 # Claude Code notification hook
 # Usage: notify.sh <type> [message]
 # Types: permission, complete
-# Click on notification to focus the correct terminal
+#
+# Uses kitty's OSC 99 for notifications with native click-to-focus.
+# Falls back to notify-send when not running inside kitty.
 
 TYPE="${1:-notification}"
 MESSAGE="${2:-Claude Code notification}"
 
-# Get the working directory for context in notifications
-WORK_DIR="${PWD/#$HOME/~}"
 PROJECT_NAME=$(basename "$PWD")
 
-# Find the exact terminal window that spawned this hook
-get_parent_terminal_window() {
-    # Method 1: Use CLAUDE_TERMINAL_WINDOW (set by wrapper function in bashrc)
-    # This is the most reliable because it captures window ID at Claude launch time
-    if [ -n "$CLAUDE_TERMINAL_WINDOW" ]; then
-        echo "$CLAUDE_TERMINAL_WINDOW"
-        return
+# Add project context
+BODY="$MESSAGE"
+if [ -n "$PROJECT_NAME" ]; then
+    BODY="[$PROJECT_NAME] $MESSAGE"
+fi
+
+play_sound() {
+    local sound="$1"
+    if [ -n "$sound" ] && command -v paplay &>/dev/null && [ -f "$sound" ]; then
+        paplay "$sound" &
     fi
-
-    # Method 2: Use WINDOWID if available (may not be inherited through to hooks)
-    if [ -n "$WINDOWID" ]; then
-        echo "$WINDOWID"
-        return
-    fi
-
-    # Method 3: Walk up the process tree to find the parent Terminator process
-    local pid=$$
-    local terminator_pid=""
-
-    while [ "$pid" -gt 1 ]; do
-        local parent_pid parent_name
-        parent_pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
-        [ -z "$parent_pid" ] && break
-
-        parent_name=$(ps -o comm= -p "$parent_pid" 2>/dev/null)
-
-        # Terminator is Python-based, check for python or terminator
-        if [[ "$parent_name" == "terminator" || "$parent_name" == "python"* ]]; then
-            local cmdline
-            cmdline=$(ps -o args= -p "$parent_pid" 2>/dev/null)
-            if [[ "$cmdline" == *"terminator"* ]]; then
-                terminator_pid="$parent_pid"
-                break
-            fi
-        fi
-
-        pid="$parent_pid"
-    done
-
-    if [ -n "$terminator_pid" ]; then
-        local win
-        win=$(xdotool search --pid "$terminator_pid" 2>/dev/null | head -1)
-        if [ -n "$win" ]; then
-            echo "$win"
-            return
-        fi
-    fi
-
-    # Method 4: Fall back to searching by title (least reliable with multiple terminals)
-    local win
-    win=$(xdotool search --name "claude" --class "Terminator" 2>/dev/null | head -1)
-    if [ -z "$win" ]; then
-        win=$(xdotool search --class "Terminator" 2>/dev/null | head -1)
-    fi
-    echo "$win"
 }
 
-focus_terminal() {
-    local win="$1"
-    if [ -n "$win" ]; then
-        xdotool windowactivate "$win" 2>/dev/null
+send_kitty_notification() {
+    local urgency="$1"
+    local title="$2"
+    local body="$3"
+
+    # OSC 99 format: \e]99;key=value:key=value;payload\e\\
+    # a=focus  — focus the kitty window when the notification is clicked (default)
+    # u=0|1|2  — urgency: low, normal, critical
+    local u=1
+    [ "$urgency" = "critical" ] && u=2
+
+    # Write OSC 99 to the terminal that launched claude, not to this hook's stdout
+    if [ -n "$CLAUDE_TTY" ]; then
+        printf '\x1b]99;i=claude-code:u=%s:d=0;%s\x1b\\' "$u" "$title" > "$CLAUDE_TTY"
+        printf '\x1b]99;i=claude-code:d=1:p=body;%s\x1b\\' "$body" > "$CLAUDE_TTY"
+    else
+        printf '\x1b]99;i=claude-code:u=%s:d=0;%s\x1b\\' "$u" "$title"
+        printf '\x1b]99;i=claude-code:d=1:p=body;%s\x1b\\' "$body"
     fi
+}
+
+send_fallback_notification() {
+    local urgency="$1"
+    local title="$2"
+    local body="$3"
+
+    notify-send -u "$urgency" -a "Claude Code" "$title" "$body" 2>/dev/null
 }
 
 send_notification() {
@@ -81,53 +59,25 @@ send_notification() {
     local body="$3"
     local sound="$4"
 
-    # Capture window ID now, while we're still in the right process context
-    local win
-    win=$(get_parent_terminal_window)
+    play_sound "$sound"
 
-    # Add project context to the notification body
-    local full_body="$body"
-    if [ -n "$PROJECT_NAME" ]; then
-        full_body="[$PROJECT_NAME] $body"
-    fi
-
-    # Play sound if available
-    if [ -n "$sound" ] && command -v paplay &>/dev/null && [ -f "$sound" ]; then
-        paplay "$sound" &
-    fi
-
-    # Use dunstify if available (supports click actions), otherwise fall back to notify-send
-    if command -v dunstify &>/dev/null; then
-        # Use window ID as notification ID so each terminal gets its own notification slot
-        local notify_id="${win:-0}"
-        # Truncate to valid range (dunst uses 32-bit signed int)
-        notify_id=$((notify_id % 2147483647))
-
-        # dunstify returns action name on stdout when clicked
-        local action
-        action=$(dunstify -a "Claude Code" -u "$urgency" \
-            -r "$notify_id" \
-            --action="focus,Focus Terminal" \
-            "$title" "$full_body")
-
-        if [ "$action" = "focus" ]; then
-            focus_terminal "$win"
-        fi
+    if [ -n "$KITTY_PID" ]; then
+        send_kitty_notification "$urgency" "$title" "$body"
     else
-        notify-send -u "$urgency" -a "Claude Code" "$title" "$full_body"
+        send_fallback_notification "$urgency" "$title" "$body"
     fi
 }
 
 case "$TYPE" in
     permission)
-        send_notification "critical" "Permission Required" "$MESSAGE" \
+        send_notification "critical" "Permission Required" "$BODY" \
             "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
         ;;
     complete)
-        send_notification "normal" "Task Complete" "$MESSAGE" \
+        send_notification "normal" "Task Complete" "$BODY" \
             "/usr/share/sounds/freedesktop/stereo/complete.oga"
         ;;
     *)
-        send_notification "normal" "Claude Code" "$MESSAGE" ""
+        send_notification "normal" "Claude Code" "$BODY" ""
         ;;
 esac
