@@ -79,14 +79,12 @@ install_dir() {
     local dest="$2"
 
     # Create parent directory if needed
-    mkdir -p "$(dirname "$dest")"
+    mkdir -p "$dest"
 
-    # Backup existing directory
-    backup_dir "$dest"
-
-    # Copy the directory
-    cp -r "$src" "$dest"
-    echo "Installed $src -> $dest"
+    # Merge: copy repo contents into destination without removing existing files
+    # (e.g. externally-cloned skills won't be wiped out)
+    cp -r "$src"/. "$dest"/
+    echo "Installed $src -> $dest (merged)"
 }
 
 echo "Installing dotfiles from $DOTFILES_DIR"
@@ -115,6 +113,30 @@ for src in "${!DIRS[@]}"; do
 done
 
 echo "========================================="
+echo ""
+
+# ---------------------------------------------------------------------------
+# External skills (cloned from git)
+# ---------------------------------------------------------------------------
+
+declare -A EXTERNAL_SKILLS=(
+    ["napkin"]="https://github.com/blader/napkin.git"
+)
+
+for skill in "${!EXTERNAL_SKILLS[@]}"; do
+    skill_dir="$HOME/.claude/skills/$skill"
+    repo_url="${EXTERNAL_SKILLS[$skill]}"
+    if [[ -d "$skill_dir/.git" ]]; then
+        echo "Updating skill $skill..."
+        git -C "$skill_dir" pull --ff-only 2>/dev/null || \
+            echo "Warning: Could not update $skill (pull failed)"
+    else
+        echo "Installing skill $skill..."
+        rm -rf "$skill_dir"
+        git clone "$repo_url" "$skill_dir"
+    fi
+done
+
 echo ""
 
 # ---------------------------------------------------------------------------
