@@ -35,10 +35,10 @@ PORT = int(os.environ.get("CLAUDE_HOOKS_PORT", 6271))
 
 # Anthropic published pricing (USD per million tokens)
 PRICING = {
-    "claude-opus-4": {"input": 15.0, "output": 75.0},
-    "claude-sonnet-4": {"input": 3.0, "output": 15.0},
-    "claude-haiku-4": {"input": 0.25, "output": 1.25},
-    "default": {"input": 3.0, "output": 15.0},
+    "claude-opus-4": {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.50},
+    "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
+    "claude-haiku-4": {"input": 0.25, "output": 1.25, "cache_write": 0.30, "cache_read": 0.025},
+    "default": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
 }
 
 # ---------------------------------------------------------------------------
@@ -168,10 +168,13 @@ def estimate_cost(transcript_path: str | None) -> float:
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                usage = entry.get("usage")
+                msg = entry.get("message")
+                if not isinstance(msg, dict):
+                    continue
+                usage = msg.get("usage")
                 if not usage:
                     continue
-                model = entry.get("model", "")
+                model = msg.get("model", "")
                 pricing_key = "default"
                 for key in PRICING:
                     if key != "default" and key in model:
@@ -179,8 +182,15 @@ def estimate_cost(transcript_path: str | None) -> float:
                         break
                 prices = PRICING[pricing_key]
                 inp = usage.get("input_tokens", 0)
+                cache_write = usage.get("cache_creation_input_tokens", 0)
+                cache_read = usage.get("cache_read_input_tokens", 0)
                 out = usage.get("output_tokens", 0)
-                total += (inp * prices["input"] + out * prices["output"]) / 1_000_000
+                total += (
+                    inp * prices["input"]
+                    + cache_write * prices["cache_write"]
+                    + cache_read * prices["cache_read"]
+                    + out * prices["output"]
+                ) / 1_000_000
     except Exception:
         pass
     return round(total, 4)
