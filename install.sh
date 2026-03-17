@@ -115,6 +115,22 @@ done
 echo "========================================="
 echo ""
 
+# Create ~/.gitconfig.local if it doesn't exist (for [user] and machine-specific git config)
+if [[ ! -f "$HOME/.gitconfig.local" ]]; then
+    cat > "$HOME/.gitconfig.local" << 'EOF'
+# Machine-specific git config (not tracked in dotfiles repo)
+# Add your [user] section here, e.g.:
+# [user]
+#     name = Your Name
+#     email = your@email.com
+EOF
+    echo "Created ~/.gitconfig.local (add your [user] section there)"
+else
+    echo "~/.gitconfig.local already exists, leaving it alone"
+fi
+
+echo ""
+
 # ---------------------------------------------------------------------------
 # External skills (cloned from git)
 # ---------------------------------------------------------------------------
