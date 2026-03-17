@@ -1,0 +1,14 @@
+[Unit]
+Description=Claude Code HTTP Hooks Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.claude/hooks/server/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 6271 --log-level warning
+WorkingDirectory=%h/.claude/hooks/server
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

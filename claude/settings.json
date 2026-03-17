@@ -1,32 +1,121 @@
 {
-  "allowedPrompts": [
-    {"tool": "Bash", "prompt": "git status"},
-    {"tool": "Bash", "prompt": "git log"},
-    {"tool": "Bash", "prompt": "git diff"},
-    {"tool": "Bash", "prompt": "git show"},
-    {"tool": "Bash", "prompt": "git branch"},
-    {"tool": "Bash", "prompt": "git remote"},
-    {"tool": "Bash", "prompt": "git stash list"},
-    {"tool": "Bash", "prompt": "git rev-parse"},
-    {"tool": "Bash", "prompt": "git describe"},
-    {"tool": "Bash", "prompt": "git ls-files"},
-    {"tool": "Bash", "prompt": "git blame"},
-    {"tool": "Bash", "prompt": "run tests"},
-    {"tool": "Bash", "prompt": "run linter"},
-    {"tool": "Bash", "prompt": "run type checker"},
-    {"tool": "Bash", "prompt": "run formatter"},
-    {"tool": "Bash", "prompt": "build project"},
-    {"tool": "Bash", "prompt": "check versions"},
-    {"tool": "Bash", "prompt": "list dependencies"},
-    {"tool": "Bash", "prompt": "list directory contents"},
-    {"tool": "Bash", "prompt": "show current directory"},
-    {"tool": "Bash", "prompt": "show environment variables"},
-    {"tool": "Bash", "prompt": "show disk usage"},
-    {"tool": "Bash", "prompt": "show file info"},
-    {"tool": "Bash", "prompt": "show command location"}
-  ],
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(cargo *)",
+      "Bash(rustfmt *)",
+      "Bash(rustc *)",
+      "Bash(clippy-driver *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(uv *)",
+      "Bash(uvx *)",
+      "Bash(ruff *)",
+      "Bash(pytest *)",
+      "Bash(pip *)",
+      "Bash(vercel *)",
+      "Bash(podman *)",
+      "Bash(make *)",
+      "Bash(cmake *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(which *)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(fd *)",
+      "Bash(jq *)",
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(cut *)",
+      "Bash(tr *)",
+      "Bash(diff *)",
+      "Bash(patch *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(pwd)",
+      "Bash(whoami)",
+      "Bash(date)",
+      "Bash(env)",
+      "Bash(printenv *)",
+      "Bash(du *)",
+      "Bash(df *)",
+      "Bash(file *)",
+      "Bash(stat *)",
+      "Bash(realpath *)",
+      "Bash(dirname *)",
+      "Bash(basename *)",
+      "Bash(xargs *)",
+      "Bash(tee *)",
+      "Bash(touch *)",
+      "Bash(tar *)",
+      "Bash(unzip *)",
+      "Bash(zip *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(sudo rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(chmod 777 *)",
+      "Bash(chmod -R 777 *)",
+      "Bash(mkfs.*)",
+      "Bash(dd if=* of=/dev/*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Write(.env)",
+      "Write(.env.*)",
+      "Edit(.env)",
+      "Edit(.env.*)"
+    ]
+  },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/pre-tool-use",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/post-tool-use",
+            "timeout": 5
+          }
+        ]
+      },
       {
         "matcher": "Edit",
         "hooks": [
@@ -34,6 +123,98 @@
             "type": "command",
             "command": "~/.claude/hooks/format-on-edit.sh",
             "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/format-on-edit.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/post-tool-use-failure",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/permission-request",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/user-prompt-submit",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/stop",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh complete 'Claude has finished the current task'",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/review-on-stop.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/subagent-stop",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:6271/hooks/task-completed",
+            "timeout": 10
           }
         ]
       }
@@ -50,19 +231,14 @@
         ]
       }
     ],
-    "Stop": [
+    "PostCompact": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/notify.sh complete 'Claude has finished the current task'",
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/review-on-stop.sh",
-            "async": true
+            "command": "~/.claude/hooks/post-compact.sh",
+            "async": false
           }
         ]
       }

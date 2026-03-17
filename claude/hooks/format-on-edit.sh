@@ -33,7 +33,7 @@ fi
 
 # Early exit for unsupported file types (avoids unnecessary config parsing)
 # Add new extensions here as formatters are added
-SUPPORTED_EXTENSIONS="py|pyi|js|jsx|ts|tsx|mjs|cjs|json|jsonc"
+SUPPORTED_EXTENSIONS="py|pyi|js|jsx|ts|tsx|mjs|cjs|json|jsonc|rs"
 EXT_CHECK="${FILE_PATH##*.}"
 if [[ ! "$EXT_CHECK" =~ ^($SUPPORTED_EXTENSIONS)$ ]]; then
     exit 0
@@ -135,6 +135,32 @@ format_python() {
     fi
 }
 
+format_rust() {
+    local file="$1"
+    local config_section="rust"
+
+    local section_enabled=$(jq -r ".$config_section.enabled // true" "$CONFIG_FILE")
+    if [[ "$section_enabled" != "true" ]]; then
+        log "Rust formatting disabled"
+        return 0
+    fi
+
+    local edition=$(jq -r ".$config_section.options.edition // \"2021\"" "$CONFIG_FILE")
+
+    local rustfmt_args=("--edition" "$edition")
+
+    if command -v rustfmt &>/dev/null; then
+        log "Running: rustfmt ${rustfmt_args[*]} $file"
+        rustfmt "${rustfmt_args[@]}" "$file" 2>&1 | while read -r line; do log "rustfmt: $line"; done
+    elif [[ -f "$HOME/.cargo/bin/rustfmt" ]]; then
+        log "Running: $HOME/.cargo/bin/rustfmt ${rustfmt_args[*]} $file"
+        "$HOME/.cargo/bin/rustfmt" "${rustfmt_args[@]}" "$file" 2>&1 | while read -r line; do log "rustfmt: $line"; done
+    else
+        log "ERROR: rustfmt not found"
+        return 1
+    fi
+}
+
 format_json() {
     local file="$1"
     local config_section="json"
@@ -169,6 +195,7 @@ format_json() {
 JS_EXTENSIONS=$(jq -r '.javascript.extensions // [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"] | .[]' "$CONFIG_FILE")
 PY_EXTENSIONS=$(jq -r '.python.extensions // [".py", ".pyi"] | .[]' "$CONFIG_FILE")
 JSON_EXTENSIONS=$(jq -r '.json.extensions // [".json", ".jsonc"] | .[]' "$CONFIG_FILE")
+RUST_EXTENSIONS=$(jq -r '.rust.extensions // [".rs"] | .[]' "$CONFIG_FILE")
 
 if echo "$JS_EXTENSIONS" | grep -qx -- "$EXT_LOWER"; then
     format_javascript "$FILE_PATH"
@@ -176,6 +203,8 @@ elif echo "$PY_EXTENSIONS" | grep -qx -- "$EXT_LOWER"; then
     format_python "$FILE_PATH"
 elif echo "$JSON_EXTENSIONS" | grep -qx -- "$EXT_LOWER"; then
     format_json "$FILE_PATH"
+elif echo "$RUST_EXTENSIONS" | grep -qx -- "$EXT_LOWER"; then
+    format_rust "$FILE_PATH"
 else
     log "No formatter configured for extension: $EXT_LOWER"
 fi

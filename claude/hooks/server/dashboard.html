@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Dashboard</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --purple: #bc8cff;
+  --font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.5; }
+a { color: var(--accent); text-decoration: none; }
+
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: 16px; font-weight: 600; }
+.controls { display: flex; gap: 16px; align-items: center; }
+.controls label { display: flex; align-items: center; gap: 6px; color: var(--text-dim); cursor: pointer; }
+.controls select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  padding: 4px 8px; border-radius: 4px; font-family: var(--font); font-size: 12px;
+}
+
+.container { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+/* Stats cards */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; display: flex; flex-direction: column; gap: 4px;
+}
+.stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); }
+.stat-card .value { font-size: 28px; font-weight: 700; }
+.stat-card.green .value { color: var(--green); }
+.stat-card.blue .value { color: var(--accent); }
+.stat-card.yellow .value { color: var(--yellow); }
+.stat-card.red .value { color: var(--red); }
+.stat-card.purple .value { color: var(--purple); }
+
+/* Grid layouts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Cards */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 16px; overflow: hidden;
+}
+.card h2 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tr:hover td { background: rgba(88,166,255,0.04); }
+
+/* Badges */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;
+}
+.badge.active { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge.stopped { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.badge.completed { background: rgba(88,166,255,0.15); color: var(--accent); }
+.badge.success { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge.failure { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge.blocked { background: rgba(248,81,73,0.15); color: var(--red); }
+
+/* Bar chart */
+.bar-chart { display: flex; flex-direction: column; gap: 6px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-label { width: 80px; text-align: right; font-size: 11px; color: var(--text-dim); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { flex: 1; height: 20px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; display: flex; align-items: center; padding-left: 6px; font-size: 10px; color: #fff; font-weight: 600; min-width: fit-content; }
+.bar-count { width: 50px; font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+
+/* Empty state */
+.empty { color: var(--text-dim); text-align: center; padding: 24px; font-style: italic; }
+
+/* Status dot */
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
+.dot.live { background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Timestamp */
+.ts { color: var(--text-dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot live"></span>Claude Code Dashboard</h1>
+  <div class="controls">
+    <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh</label>
+    <select id="time-range">
+      <option value="1">Today</option>
+      <option value="7" selected>This Week</option>
+      <option value="30">This Month</option>
+      <option value="90">Quarter</option>
+    </select>
+    <span class="ts" id="last-updated"></span>
+  </div>
+</header>
+<div class="container">
+  <div class="stats-grid" id="stats-grid"></div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>Sessions</h2>
+      <div id="sessions-content"><p class="empty">Loading...</p></div>
+    </div>
+    <div class="card">
+      <h2>Tool Usage</h2>
+      <div id="tool-chart"><p class="empty">Loading...</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Recent Tool Calls</h2>
+    <div id="tool-calls-content"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>Permission Requests</h2>
+      <div id="permissions-content"><p class="empty">Loading...</p></div>
+    </div>
+    <div class="card">
+      <h2>Blocked Actions</h2>
+      <div id="blocked-content"><p class="empty">Loading...</p></div>
+    </div>
+  </div>
+</div>
+<script>
+const API = window.location.origin;
+let refreshInterval;
+
+function fmtTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtCost(v) { return '$' + (v || 0).toFixed(2); }
+
+function truncate(s, n=80) {
+  if (!s) return '-';
+  if (typeof s === 'object') s = JSON.stringify(s);
+  return s.length > n ? s.slice(0, n) + '...' : s;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+function renderStats(stats) {
+  const el = document.getElementById('stats-grid');
+  if (!stats) { el.innerHTML = '<p class="empty">Server unreachable</p>'; return; }
+  el.innerHTML = `
+    <div class="stat-card blue"><span class="label">Sessions</span><span class="value">${stats.total_sessions || 0}</span></div>
+    <div class="stat-card green"><span class="label">Tool Calls</span><span class="value">${stats.total_tool_calls || 0}</span></div>
+    <div class="stat-card purple"><span class="label">Prompts</span><span class="value">${stats.total_prompts || 0}</span></div>
+    <div class="stat-card yellow"><span class="label">Est. Cost</span><span class="value">${fmtCost(stats.total_cost)}</span></div>
+    <div class="stat-card${stats.blocked_count > 0 ? ' red' : ''}"><span class="label">Blocked</span><span class="value">${stats.blocked_count || 0}</span></div>
+    <div class="stat-card"><span class="label">Permissions</span><span class="value">${stats.permission_count || 0}</span></div>
+  `;
+}
+
+function renderToolChart(stats) {
+  const el = document.getElementById('tool-chart');
+  if (!stats || !stats.tool_breakdown || stats.tool_breakdown.length === 0) {
+    el.innerHTML = '<p class="empty">No tool calls yet</p>';
+    return;
+  }
+  const max = stats.tool_breakdown[0].count;
+  el.innerHTML = '<div class="bar-chart">' + stats.tool_breakdown.slice(0, 12).map(t => `
+    <div class="bar-row">
+      <span class="bar-label" title="${escapeHtml(t.tool_name)}">${escapeHtml(t.tool_name)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(t.count/max*100,2)}%">${t.count}</div></div>
+    </div>
+  `).join('') + '</div>';
+}
+
+function renderSessions(sessions) {
+  const el = document.getElementById('sessions-content');
+  if (!sessions || sessions.length === 0) {
+    el.innerHTML = '<p class="empty">No sessions yet</p>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Project</th><th>Status</th><th>Tools</th><th>Prompts</th><th>Cost</th><th>Last Active</th></tr></thead>
+    <tbody>${sessions.slice(0, 20).map(s => `<tr>
+      <td title="${escapeHtml(s.cwd || '')}">${escapeHtml(s.project || 'unknown')}</td>
+      <td><span class="badge ${s.status}">${s.status}</span></td>
+      <td>${s.tool_call_count}</td>
+      <td>${s.prompt_count}</td>
+      <td>${fmtCost(s.estimated_cost_usd)}</td>
+      <td class="ts">${fmtTime(s.last_activity)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function renderToolCalls(calls) {
+  const el = document.getElementById('tool-calls-content');
+  if (!calls || calls.length === 0) {
+    el.innerHTML = '<p class="empty">No tool calls yet</p>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Input</th></tr></thead>
+    <tbody>${calls.slice(0, 50).map(c => {
+      let input = '-';
+      try { const p = JSON.parse(c.tool_input); input = p.command || p.file_path || p.pattern || truncate(c.tool_input); } catch { input = truncate(c.tool_input); }
+      return `<tr>
+        <td class="ts">${fmtTime(c.timestamp)}</td>
+        <td>${escapeHtml(c.tool_name)}</td>
+        <td><span class="badge ${c.success ? 'success' : 'failure'}">${c.success ? 'ok' : 'fail'}</span></td>
+        <td title="${escapeHtml(c.tool_input || '')}">${escapeHtml(input)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function renderPermissions(perms) {
+  const el = document.getElementById('permissions-content');
+  if (!perms || perms.length === 0) {
+    el.innerHTML = '<p class="empty">No permission requests</p>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Time</th><th>Tool</th><th>Input</th></tr></thead>
+    <tbody>${perms.slice(0, 30).map(p => {
+      let input = '-';
+      try { const d = JSON.parse(p.tool_input); input = d.command || d.file_path || truncate(p.tool_input); } catch { input = truncate(p.tool_input); }
+      return `<tr>
+        <td class="ts">${fmtTime(p.timestamp)}</td>
+        <td>${escapeHtml(p.tool_name)}</td>
+        <td title="${escapeHtml(p.tool_input || '')}">${escapeHtml(input)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function renderBlocked(blocked) {
+  const el = document.getElementById('blocked-content');
+  if (!blocked || blocked.length === 0) {
+    el.innerHTML = '<p class="empty">No blocked actions</p>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Time</th><th>Tool</th><th>Rule</th><th>Input</th></tr></thead>
+    <tbody>${blocked.map(b => {
+      let input = '-';
+      try { const d = JSON.parse(b.tool_input); input = d.command || d.file_path || truncate(b.tool_input); } catch { input = truncate(b.tool_input); }
+      return `<tr>
+        <td class="ts">${fmtTime(b.timestamp)}</td>
+        <td>${escapeHtml(b.tool_name)}</td>
+        <td><span class="badge blocked">${escapeHtml(b.reason || b.rule_matched)}</span></td>
+        <td title="${escapeHtml(b.tool_input || '')}">${escapeHtml(input)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+async function refresh() {
+  const days = document.getElementById('time-range').value;
+  const [stats, sessions, calls, perms, blocked] = await Promise.all([
+    fetchJSON(`${API}/api/stats?days=${days}`),
+    fetchJSON(`${API}/api/sessions?limit=20`),
+    fetchJSON(`${API}/api/tool-calls?limit=50`),
+    fetchJSON(`${API}/api/permissions?limit=30`),
+    fetchJSON(`${API}/api/blocked?limit=30`),
+  ]);
+  renderStats(stats);
+  renderToolChart(stats);
+  renderSessions(sessions);
+  renderToolCalls(calls);
+  renderPermissions(perms);
+  renderBlocked(blocked);
+  document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+function setupAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  if (document.getElementById('auto-refresh').checked) {
+    refreshInterval = setInterval(refresh, 10000);
+  }
+}
+
+document.getElementById('auto-refresh').addEventListener('change', setupAutoRefresh);
+document.getElementById('time-range').addEventListener('change', refresh);
+
+refresh();
+setupAutoRefresh();
+</script>
+</body>
+</html>

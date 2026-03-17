@@ -1,0 +1,5 @@
+# Hooks server runtime artifacts
+claude/hooks/server/.venv/
+claude/hooks/server/.pid
+claude/hooks/server/__pycache__/
+*.pyc

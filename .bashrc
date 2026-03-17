@@ -418,7 +418,7 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 export PATH=$PATH:$ANDROID_HOME/emulator
 
 # ==============================================================================
-# Claude Code Terminal Capture
+# Claude Code Integration
 # ==============================================================================
 
 # Wrapper to capture the current TTY before launching Claude.
@@ -427,6 +427,56 @@ export PATH=$PATH:$ANDROID_HOME/emulator
 claude() {
     export CLAUDE_TTY="$(tty)"
     command claude "$@"
+}
+
+# Claude Code hooks server management
+claude-hooks() {
+    case "${1:-status}" in
+        start)    systemctl --user start claude-hooks ;;
+        stop)     systemctl --user stop claude-hooks ;;
+        restart)  systemctl --user restart claude-hooks ;;
+        status)   systemctl --user status claude-hooks ;;
+        logs)     journalctl --user -u claude-hooks -f ;;
+        dashboard)
+            local url="http://localhost:${CLAUDE_HOOKS_PORT:-6271}/dashboard"
+            echo "Opening $url"
+            xdg-open "$url" 2>/dev/null || echo "Visit: $url"
+            ;;
+        *)
+            echo "Usage: claude-hooks {start|stop|restart|status|logs|dashboard}"
+            ;;
+    esac
+}
+
+# Create a git worktree for parallel Claude sessions
+claude-worktree() {
+    local branch="$1"
+    local base="${2:-$(git branch --show-current 2>/dev/null || echo main)}"
+
+    if [[ -z "$branch" ]]; then
+        echo "Usage: claude-worktree <branch-name> [base-branch]"
+        echo ""
+        echo "Active worktrees:"
+        git worktree list 2>/dev/null || echo "  Not in a git repo"
+        return 1
+    fi
+
+    local repo_name
+    repo_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
+    local worktree_path="../${repo_name}--${branch}"
+
+    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+        git worktree add "$worktree_path" "$branch"
+    else
+        git worktree add "$worktree_path" -b "$branch" "$base"
+    fi
+
+    echo ""
+    echo "Worktree ready. To start a parallel Claude session:"
+    echo "  cd $worktree_path && claude"
+    echo ""
+    echo "To remove when done:"
+    echo "  git worktree remove $worktree_path"
 }
 
 # Enable command-in-title feature (must be at end of bashrc to avoid

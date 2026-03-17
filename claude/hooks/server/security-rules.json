@@ -1,0 +1,118 @@
+{
+  "deny_commands": [
+    {
+      "pattern": "rm\\s+-[^\\s]*r[^\\s]*f.*\\s+/($|\\s)",
+      "description": "Recursive force delete from root"
+    },
+    {
+      "pattern": "rm\\s+-[^\\s]*r[^\\s]*f.*\\s+~/?\\s*$",
+      "description": "Recursive force delete of home directory"
+    },
+    {
+      "pattern": "mkfs\\.",
+      "description": "Filesystem formatting"
+    },
+    {
+      "pattern": "dd\\s+.*of=/dev/sd",
+      "description": "Raw disk write"
+    },
+    {
+      "pattern": ":\\(\\)\\s*\\{\\s*:\\|:\\s*&\\s*\\}\\s*;\\s*:",
+      "description": "Fork bomb"
+    },
+    {
+      "pattern": "git\\s+push\\s+.*--force",
+      "description": "Git force push"
+    },
+    {
+      "pattern": "git\\s+push\\s+-f\\b",
+      "description": "Git force push (short flag)"
+    },
+    {
+      "pattern": "git\\s+reset\\s+--hard",
+      "description": "Git hard reset"
+    },
+    {
+      "pattern": "git\\s+clean\\s+-[^\\s]*f",
+      "description": "Git clean with force"
+    },
+    {
+      "pattern": "chmod\\s+777",
+      "description": "World-writable permissions"
+    },
+    {
+      "pattern": "chmod\\s+-R\\s+777",
+      "description": "Recursive world-writable permissions"
+    },
+    {
+      "pattern": "curl\\s+.*\\|\\s*(ba)?sh",
+      "description": "Pipe remote script to shell"
+    },
+    {
+      "pattern": "wget\\s+.*\\|\\s*(ba)?sh",
+      "description": "Pipe remote script to shell"
+    },
+    {
+      "pattern": "\\bDROP\\s+(TABLE|DATABASE|SCHEMA)\\b",
+      "description": "SQL DROP statement"
+    },
+    {
+      "pattern": "\\bTRUNCATE\\s+TABLE\\b",
+      "description": "SQL TRUNCATE statement"
+    },
+    {
+      "pattern": "\\bDELETE\\s+FROM\\s+\\S+\\s*;?\\s*$",
+      "description": "SQL DELETE without WHERE clause"
+    },
+    {
+      "pattern": "sudo\\s+rm\\s+-[^\\s]*r[^\\s]*f",
+      "description": "Sudo recursive force delete"
+    },
+    {
+      "pattern": "docker\\s+system\\s+prune\\s+-a",
+      "description": "Docker full system prune"
+    },
+    {
+      "pattern": "podman\\s+system\\s+prune\\s+-a",
+      "description": "Podman full system prune"
+    }
+  ],
+  "deny_file_patterns": [
+    {
+      "pattern": "(\\/|^)\\.env(\\..*)?$",
+      "description": "Environment files (.env, .env.local, etc.)"
+    },
+    {
+      "pattern": "(\\/|^)credentials\\.json$",
+      "description": "Credentials file"
+    },
+    {
+      "pattern": "(\\/|^)\\.ssh/",
+      "description": "SSH directory"
+    },
+    {
+      "pattern": "(\\/|^)\\.gnupg/",
+      "description": "GPG directory"
+    },
+    {
+      "pattern": "(\\/|^)id_rsa$",
+      "description": "SSH private key"
+    },
+    {
+      "pattern": "(\\/|^)id_ed25519$",
+      "description": "SSH private key (ed25519)"
+    },
+    {
+      "pattern": "\\.pem$",
+      "description": "PEM certificate/key file"
+    },
+    {
+      "pattern": "(\\/|^)\\.aws/credentials$",
+      "description": "AWS credentials"
+    },
+    {
+      "pattern": "(\\/|^)\\.kube/config$",
+      "description": "Kubernetes config"
+    }
+  ]
+}
