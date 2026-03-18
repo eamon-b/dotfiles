@@ -68,7 +68,14 @@
       "Bash(touch *)",
       "Bash(tar *)",
       "Bash(unzip *)",
-      "Bash(zip *)"
+      "Bash(zip *)",
+      "Bash(adb *)",
+      "Bash(sqlite3 *)",
+      "Bash(systemctl --user *)",
+      "Bash(journalctl *)",
+      "Bash(claude-hooks *)",
+      "Bash(sleep *)",
+      "Bash(cd *)",
     ],
     "deny": [
       "Bash(rm -rf /)",
