@@ -75,7 +75,7 @@
       "Bash(journalctl *)",
       "Bash(claude-hooks *)",
       "Bash(sleep *)",
-      "Bash(cd *)",
+      "Bash(cd *)"
     ],
     "deny": [
       "Bash(rm -rf /)",

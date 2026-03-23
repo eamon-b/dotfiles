@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Code Dashboard</title>
 <style>
-:root {
+:root, [data-theme="dark"] {
   --bg: #0d1117;
   --surface: #161b22;
   --border: #30363d;
@@ -17,6 +17,18 @@
   --red: #f85149;
   --purple: #bc8cff;
   --font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+}
+[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-dim: #656d76;
+  --accent: #0969da;
+  --green: #1a7f37;
+  --yellow: #9a6700;
+  --red: #cf222e;
+  --purple: #8250df;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.5; }
@@ -33,12 +45,17 @@ header h1 { font-size: 16px; font-weight: 600; }
   background: var(--surface); color: var(--text); border: 1px solid var(--border);
   padding: 4px 8px; border-radius: 4px; font-family: var(--font); font-size: 12px;
 }
+.theme-toggle {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+.theme-toggle:hover { border-color: var(--accent); }
 
 .container { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
 
 /* Stats cards */
 .stats-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px; margin-bottom: 20px;
 }
 .stat-card {
@@ -52,6 +69,18 @@ header h1 { font-size: 16px; font-weight: 600; }
 .stat-card.yellow .value { color: var(--yellow); }
 .stat-card.red .value { color: var(--red); }
 .stat-card.purple .value { color: var(--purple); }
+
+/* Model breakdown */
+.model-breakdown {
+  margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+}
+.model-chip {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 4px 12px; font-size: 11px; display: flex; align-items: center; gap: 8px;
+}
+.model-chip .model-name { color: var(--text); font-weight: 500; }
+.model-chip .model-sessions { color: var(--text-dim); }
+.model-chip .model-cost { color: var(--yellow); font-weight: 600; }
 
 /* Grid layouts */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
@@ -69,6 +98,8 @@ table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tr:hover td { background: rgba(88,166,255,0.04); }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: rgba(88,166,255,0.08); }
 
 /* Badges */
 .badge {
@@ -85,9 +116,22 @@ tr:hover td { background: rgba(88,166,255,0.04); }
 .bar-chart { display: flex; flex-direction: column; gap: 6px; }
 .bar-row { display: flex; align-items: center; gap: 8px; }
 .bar-label { width: 80px; text-align: right; font-size: 11px; color: var(--text-dim); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-track { flex: 1; height: 20px; background: var(--bg); border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; display: flex; align-items: center; padding-left: 6px; font-size: 10px; color: #fff; font-weight: 600; min-width: fit-content; }
-.bar-count { width: 50px; font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+.bar-track { flex: 1; height: 20px; background: var(--bg); border-radius: 3px; overflow: hidden; display: flex; }
+.bar-fill { height: 100%; background: var(--green); border-radius: 3px 0 0 3px; transition: width 0.3s; display: flex; align-items: center; padding-left: 6px; font-size: 10px; color: #fff; font-weight: 600; min-width: fit-content; }
+.bar-fill-fail { height: 100%; background: var(--red); transition: width 0.3s; }
+.bar-count { min-width: 90px; font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+.bar-count .fail-count { color: var(--red); }
+
+/* Filters */
+.filters {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+}
+.filters input, .filters select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  padding: 4px 8px; border-radius: 4px; font-family: var(--font); font-size: 12px;
+}
+.filters input { width: 200px; }
+.filters input::placeholder { color: var(--text-dim); }
 
 /* Empty state */
 .empty { color: var(--text-dim); text-align: center; padding: 24px; font-style: italic; }
@@ -99,6 +143,52 @@ tr:hover td { background: rgba(88,166,255,0.04); }
 
 /* Timestamp */
 .ts { color: var(--text-dim); font-size: 11px; }
+
+/* Cost chart */
+.cost-chart svg { width: 100%; height: 200px; }
+.cost-chart .bar-rect { fill: var(--yellow); }
+.cost-chart .bar-rect:hover { fill: var(--accent); }
+.cost-chart .axis-label { fill: var(--text-dim); font-size: 10px; font-family: var(--font); }
+.cost-chart .axis-line { stroke: var(--border); stroke-width: 1; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6); z-index: 1000; display: flex;
+  align-items: center; justify-content: center;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  width: 90%; max-width: 1000px; max-height: 85vh; overflow-y: auto;
+  padding: 24px; position: relative;
+}
+.modal-close {
+  position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; cursor: pointer;
+}
+.modal-close:hover { color: var(--text); }
+.modal-header { margin-bottom: 16px; }
+.modal-header h3 { font-size: 16px; margin-bottom: 8px; }
+.modal-header .meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--text-dim); }
+.modal-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.modal-tab {
+  padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent;
+  color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--font);
+}
+.modal-tab:hover { color: var(--text); }
+.modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.token-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;
+}
+.token-card {
+  background: var(--bg); border-radius: 6px; padding: 10px;
+  text-align: center;
+}
+.token-card .label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
+.token-card .value { font-size: 18px; font-weight: 700; }
+.modal-tab-content { max-height: 400px; overflow-y: auto; }
 </style>
 </head>
 <body>
@@ -112,14 +202,21 @@ tr:hover td { background: rgba(88,166,255,0.04); }
       <option value="30">This Month</option>
       <option value="90">Quarter</option>
     </select>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme"></button>
     <span class="ts" id="last-updated"></span>
   </div>
 </header>
 <div class="container">
   <div class="stats-grid" id="stats-grid"></div>
+  <div id="model-breakdown-container"></div>
   <div class="grid-2">
     <div class="card">
       <h2>Sessions</h2>
+      <div class="filters" id="session-filters">
+        <select id="project-filter">
+          <option value="">All Projects</option>
+        </select>
+      </div>
       <div id="sessions-content"><p class="empty">Loading...</p></div>
     </div>
     <div class="card">
@@ -128,7 +225,17 @@ tr:hover td { background: rgba(88,166,255,0.04); }
     </div>
   </div>
   <div class="card">
+    <h2>Daily Cost</h2>
+    <div class="cost-chart" id="cost-chart"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="card">
     <h2>Recent Tool Calls</h2>
+    <div class="filters" id="tool-call-filters">
+      <select id="tool-name-filter">
+        <option value="">All Tools</option>
+      </select>
+      <input type="text" id="tool-search" placeholder="Search tool inputs...">
+    </div>
     <div id="tool-calls-content"><p class="empty">Loading...</p></div>
   </div>
   <div class="grid-2">
@@ -145,7 +252,29 @@ tr:hover td { background: rgba(88,166,255,0.04); }
 <script>
 const API = window.location.origin;
 let refreshInterval;
+let openModalSessionId = null;
+let lastStats = null;
 
+// --- Theme ---
+function initTheme() {
+  const saved = localStorage.getItem('dashboard-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeButton(saved);
+}
+function updateThemeButton(theme) {
+  document.getElementById('theme-toggle').textContent = theme === 'dark' ? '\u2600' : '\u263E';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('dashboard-theme', next);
+  updateThemeButton(next);
+}
+document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+initTheme();
+
+// --- Utilities ---
 function fmtTime(iso) {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -159,6 +288,33 @@ function fmtTime(iso) {
 
 function fmtCost(v) { return '$' + (v || 0).toFixed(2); }
 
+function fmtDuration(started, ended) {
+  if (!started || !ended) return '-';
+  const secs = (new Date(ended) - new Date(started)) / 1000;
+  if (secs < 0) return '-';
+  if (secs < 60) return `${Math.floor(secs)}s`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function fmtDurationSecs(secs) {
+  if (!secs || secs < 0) return '-';
+  if (secs < 60) return `${Math.floor(secs)}s`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function fmtTokens(n) {
+  if (!n) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
+
 function truncate(s, n=80) {
   if (!s) return '-';
   if (typeof s === 'object') s = JSON.stringify(s);
@@ -166,9 +322,16 @@ function truncate(s, n=80) {
 }
 
 function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
   const d = document.createElement('div');
-  d.textContent = s;
+  d.textContent = String(s);
   return d.innerHTML;
+}
+
+function successRateColor(rate) {
+  if (rate > 0.95) return 'green';
+  if (rate > 0.85) return 'yellow';
+  return 'red';
 }
 
 async function fetchJSON(url) {
@@ -177,9 +340,13 @@ async function fetchJSON(url) {
   return r.json();
 }
 
+// --- Rendering ---
 function renderStats(stats) {
   const el = document.getElementById('stats-grid');
   if (!stats) { el.innerHTML = '<p class="empty">Server unreachable</p>'; return; }
+  lastStats = stats;
+  const srColor = successRateColor(stats.success_rate || 0);
+  const srValue = stats.success_rate != null ? (stats.success_rate * 100).toFixed(1) + '%' : '-';
   el.innerHTML = `
     <div class="stat-card blue"><span class="label">Sessions</span><span class="value">${stats.total_sessions || 0}</span></div>
     <div class="stat-card green"><span class="label">Tool Calls</span><span class="value">${stats.total_tool_calls || 0}</span></div>
@@ -187,7 +354,25 @@ function renderStats(stats) {
     <div class="stat-card yellow"><span class="label">Est. Cost</span><span class="value">${fmtCost(stats.total_cost)}</span></div>
     <div class="stat-card${stats.blocked_count > 0 ? ' red' : ''}"><span class="label">Blocked</span><span class="value">${stats.blocked_count || 0}</span></div>
     <div class="stat-card"><span class="label">Permissions</span><span class="value">${stats.permission_count || 0}</span></div>
+    <div class="stat-card ${srColor}"><span class="label">Success Rate</span><span class="value">${escapeHtml(srValue)}</span></div>
   `;
+}
+
+function renderModelBreakdown(stats) {
+  const el = document.getElementById('model-breakdown-container');
+  if (!stats || !stats.model_breakdown || stats.model_breakdown.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = '<div class="model-breakdown">' +
+    '<span style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Models:</span>' +
+    stats.model_breakdown.map(m => `
+      <span class="model-chip">
+        <span class="model-name">${escapeHtml(m.model || 'unknown')}</span>
+        <span class="model-sessions">${m.session_count} session${m.session_count !== 1 ? 's' : ''}</span>
+        <span class="model-cost">${fmtCost(m.cost)}</span>
+      </span>
+    `).join('') + '</div>';
 }
 
 function renderToolChart(stats) {
@@ -197,12 +382,68 @@ function renderToolChart(stats) {
     return;
   }
   const max = stats.tool_breakdown[0].count;
-  el.innerHTML = '<div class="bar-chart">' + stats.tool_breakdown.slice(0, 12).map(t => `
+  el.innerHTML = '<div class="bar-chart">' + stats.tool_breakdown.slice(0, 12).map(t => {
+    const failures = t.failure_count || 0;
+    const successes = t.count - failures;
+    const successPct = Math.max(successes / max * 100, 1);
+    const failPct = failures / max * 100;
+    const failText = failures > 0 ? ` <span class="fail-count">(${failures} failed)</span>` : '';
+    return `
     <div class="bar-row">
       <span class="bar-label" title="${escapeHtml(t.tool_name)}">${escapeHtml(t.tool_name)}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(t.count/max*100,2)}%">${t.count}</div></div>
-    </div>
-  `).join('') + '</div>';
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${successPct}%">${successes > 0 ? successes : ''}</div>${failures > 0 ? `<div class="bar-fill-fail" style="width:${failPct}%"></div>` : ''}
+      </div>
+      <span class="bar-count">${t.count}${failText}</span>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderCostChart(stats) {
+  const el = document.getElementById('cost-chart');
+  if (!stats || !stats.daily_activity || stats.daily_activity.length === 0) {
+    el.innerHTML = '<p class="empty">No daily cost data</p>';
+    return;
+  }
+  const data = stats.daily_activity;
+  const maxCost = Math.max(...data.map(d => d.cost), 0.01);
+  const chartWidth = 600;
+  const chartHeight = 180;
+  const marginLeft = 50;
+  const marginBottom = 40;
+  const marginTop = 10;
+  const marginRight = 10;
+  const plotWidth = chartWidth - marginLeft - marginRight;
+  const plotHeight = chartHeight - marginTop - marginBottom;
+  const barWidth = Math.max(Math.floor(plotWidth / data.length) - 2, 4);
+  const barGap = Math.max(Math.floor(plotWidth / data.length) - barWidth, 1);
+
+  let bars = '';
+  let labels = '';
+  const labelEvery = data.length > 14 ? Math.ceil(data.length / 7) : (data.length > 7 ? 2 : 1);
+
+  data.forEach((d, i) => {
+    const x = marginLeft + i * (barWidth + barGap);
+    const barH = (d.cost / maxCost) * plotHeight;
+    const y = marginTop + plotHeight - barH;
+    bars += `<rect class="bar-rect" x="${x}" y="${y}" width="${barWidth}" height="${barH}" rx="2"><title>${escapeHtml(d.date)}: ${fmtCost(d.cost)}</title></rect>`;
+    if (i % labelEvery === 0) {
+      const labelDate = d.date.slice(5);
+      labels += `<text class="axis-label" x="${x + barWidth/2}" y="${chartHeight - 5}" text-anchor="middle" transform="rotate(-45 ${x + barWidth/2} ${chartHeight - 10})">${escapeHtml(labelDate)}</text>`;
+    }
+  });
+
+  // Y-axis labels
+  const ySteps = 4;
+  let yLabels = '';
+  for (let i = 0; i <= ySteps; i++) {
+    const val = (maxCost / ySteps) * i;
+    const y = marginTop + plotHeight - (i / ySteps) * plotHeight;
+    yLabels += `<text class="axis-label" x="${marginLeft - 5}" y="${y + 3}" text-anchor="end">${fmtCost(val)}</text>`;
+    yLabels += `<line class="axis-line" x1="${marginLeft}" y1="${y}" x2="${chartWidth - marginRight}" y2="${y}" stroke-dasharray="3,3" />`;
+  }
+
+  el.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="xMidYMid meet">${yLabels}${bars}${labels}</svg>`;
 }
 
 function renderSessions(sessions) {
@@ -211,17 +452,37 @@ function renderSessions(sessions) {
     el.innerHTML = '<p class="empty">No sessions yet</p>';
     return;
   }
+  // Populate project filter dropdown
+  const projectFilter = document.getElementById('project-filter');
+  const currentProject = projectFilter.value;
+  const projects = [...new Set(sessions.map(s => s.project || 'unknown').filter(Boolean))].sort();
+  const existingOptions = Array.from(projectFilter.options).map(o => o.value);
+  const newOptions = ['', ...projects];
+  if (JSON.stringify(existingOptions) !== JSON.stringify(newOptions)) {
+    projectFilter.innerHTML = '<option value="">All Projects</option>' +
+      projects.map(p => `<option value="${escapeHtml(p)}"${p === currentProject ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+  }
+
   el.innerHTML = `<table>
-    <thead><tr><th>Project</th><th>Status</th><th>Tools</th><th>Prompts</th><th>Cost</th><th>Last Active</th></tr></thead>
-    <tbody>${sessions.slice(0, 20).map(s => `<tr>
+    <thead><tr><th>Project</th><th>Status</th><th>Tools</th><th>Prompts</th><th>Cost</th><th>Duration</th><th>Last Active</th></tr></thead>
+    <tbody>${sessions.slice(0, 20).map(s => `<tr class="clickable" data-session-id="${escapeHtml(s.session_id || '')}">
       <td title="${escapeHtml(s.cwd || '')}">${escapeHtml(s.project || 'unknown')}</td>
-      <td><span class="badge ${s.status}">${s.status}</span></td>
+      <td><span class="badge ${s.status}">${escapeHtml(s.status || '')}</span></td>
       <td>${s.tool_call_count}</td>
       <td>${s.prompt_count}</td>
       <td>${fmtCost(s.estimated_cost_usd)}</td>
+      <td>${escapeHtml(fmtDuration(s.started_at, s.last_activity))}</td>
       <td class="ts">${fmtTime(s.last_activity)}</td>
     </tr>`).join('')}</tbody>
   </table>`;
+
+  // Attach click handlers for session drill-down
+  el.querySelectorAll('tr.clickable').forEach(row => {
+    row.addEventListener('click', () => {
+      const sid = row.getAttribute('data-session-id');
+      if (sid) openSessionModal(sid);
+    });
+  });
 }
 
 function renderToolCalls(calls) {
@@ -230,16 +491,31 @@ function renderToolCalls(calls) {
     el.innerHTML = '<p class="empty">No tool calls yet</p>';
     return;
   }
+  // Populate tool name filter from stats
+  if (lastStats && lastStats.tool_breakdown) {
+    const toolFilter = document.getElementById('tool-name-filter');
+    const currentTool = toolFilter.value;
+    const tools = lastStats.tool_breakdown.map(t => t.tool_name);
+    const existingOptions = Array.from(toolFilter.options).map(o => o.value);
+    const newOptions = ['', ...tools];
+    if (JSON.stringify(existingOptions) !== JSON.stringify(newOptions)) {
+      toolFilter.innerHTML = '<option value="">All Tools</option>' +
+        tools.map(t => `<option value="${escapeHtml(t)}"${t === currentTool ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
+    }
+  }
+
   el.innerHTML = `<table>
-    <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Input</th></tr></thead>
+    <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Input</th><th>Output</th></tr></thead>
     <tbody>${calls.slice(0, 50).map(c => {
       let input = '-';
       try { const p = JSON.parse(c.tool_input); input = p.command || p.file_path || p.pattern || truncate(c.tool_input); } catch { input = truncate(c.tool_input); }
+      const output = c.tool_output ? truncate(c.tool_output, 60) : '-';
       return `<tr>
         <td class="ts">${fmtTime(c.timestamp)}</td>
         <td>${escapeHtml(c.tool_name)}</td>
         <td><span class="badge ${c.success ? 'success' : 'failure'}">${c.success ? 'ok' : 'fail'}</span></td>
         <td title="${escapeHtml(c.tool_input || '')}">${escapeHtml(input)}</td>
+        <td title="${escapeHtml(c.tool_output || '')}">${escapeHtml(output)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -279,24 +555,223 @@ function renderBlocked(blocked) {
       return `<tr>
         <td class="ts">${fmtTime(b.timestamp)}</td>
         <td>${escapeHtml(b.tool_name)}</td>
-        <td><span class="badge blocked">${escapeHtml(b.reason || b.rule_matched)}</span></td>
+        <td><span class="badge blocked">${escapeHtml(b.reason || b.rule_matched || '')}</span></td>
         <td title="${escapeHtml(b.tool_input || '')}">${escapeHtml(input)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
 }
 
+// --- Session Modal ---
+async function openSessionModal(sessionId) {
+  openModalSessionId = sessionId;
+  const data = await fetchJSON(`${API}/api/sessions/${sessionId}`);
+  if (!data || !data.session) {
+    openModalSessionId = null;
+    return;
+  }
+
+  // If modal was closed while fetching, don't show
+  if (openModalSessionId !== sessionId) return;
+
+  const s = data.session;
+  const duration = s.duration_seconds ? fmtDurationSecs(s.duration_seconds) : fmtDuration(s.started_at, s.last_activity);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.id = 'session-modal';
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeModal();
+  });
+
+  const tabs = [
+    { id: 'tool_calls', label: 'Tool Calls', count: (data.tool_calls || []).length },
+    { id: 'prompts', label: 'Prompts', count: (data.prompts || []).length },
+    { id: 'permissions', label: 'Permissions', count: (data.permissions || []).length },
+    { id: 'blocked', label: 'Blocked', count: (data.blocked || []).length },
+  ];
+
+  backdrop.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <div class="modal-header">
+        <h3>${escapeHtml(s.project || 'Unknown Project')}</h3>
+        <div class="meta">
+          <span class="badge ${s.status}">${escapeHtml(s.status || '')}</span>
+          <span>Duration: ${escapeHtml(duration)}</span>
+          ${s.model ? `<span>Model: ${escapeHtml(s.model)}</span>` : ''}
+          <span>Cost: ${fmtCost(s.estimated_cost_usd)}</span>
+        </div>
+      </div>
+      <div class="token-grid">
+        <div class="token-card">
+          <div class="label">Input Tokens</div>
+          <div class="value">${fmtTokens(s.input_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="label">Output Tokens</div>
+          <div class="value">${fmtTokens(s.output_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="label">Cache Read</div>
+          <div class="value">${fmtTokens(s.cache_read_tokens)}</div>
+        </div>
+        <div class="token-card">
+          <div class="label">Cache Write</div>
+          <div class="value">${fmtTokens(s.cache_write_tokens)}</div>
+        </div>
+      </div>
+      <div class="modal-tabs">
+        ${tabs.map((t, i) => `<button class="modal-tab${i === 0 ? ' active' : ''}" data-tab="${t.id}">${t.label} (${t.count})</button>`).join('')}
+      </div>
+      <div class="modal-tab-content" id="modal-tab-content">
+        ${renderModalTab('tool_calls', data)}
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+
+  // Tab switching
+  backdrop.querySelectorAll('.modal-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      backdrop.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('modal-tab-content').innerHTML = renderModalTab(tab.getAttribute('data-tab'), data);
+    });
+  });
+}
+
+function renderModalTab(tabId, data) {
+  if (tabId === 'tool_calls') {
+    const calls = data.tool_calls || [];
+    if (calls.length === 0) return '<p class="empty">No tool calls</p>';
+    return `<table>
+      <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Input</th><th>Output</th></tr></thead>
+      <tbody>${calls.map(c => {
+        let input = '-';
+        try { const p = JSON.parse(c.tool_input); input = p.command || p.file_path || p.pattern || truncate(c.tool_input); } catch { input = truncate(c.tool_input); }
+        const output = c.tool_output ? truncate(c.tool_output, 60) : '-';
+        return `<tr>
+          <td class="ts">${fmtTime(c.timestamp)}</td>
+          <td>${escapeHtml(c.tool_name)}</td>
+          <td><span class="badge ${c.success ? 'success' : 'failure'}">${c.success ? 'ok' : 'fail'}</span></td>
+          <td title="${escapeHtml(c.tool_input || '')}">${escapeHtml(input)}</td>
+          <td title="${escapeHtml(c.tool_output || '')}">${escapeHtml(output)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+  if (tabId === 'prompts') {
+    const prompts = data.prompts || [];
+    if (prompts.length === 0) return '<p class="empty">No prompts</p>';
+    return `<table>
+      <thead><tr><th>Time</th><th>Prompt</th></tr></thead>
+      <tbody>${prompts.map(p => `<tr>
+        <td class="ts">${fmtTime(p.timestamp)}</td>
+        <td title="${escapeHtml(p.prompt_text || '')}">${escapeHtml(truncate(p.prompt_text, 120))}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  if (tabId === 'permissions') {
+    const perms = data.permissions || [];
+    if (perms.length === 0) return '<p class="empty">No permission requests</p>';
+    return `<table>
+      <thead><tr><th>Time</th><th>Tool</th><th>Input</th></tr></thead>
+      <tbody>${perms.map(p => {
+        let input = '-';
+        try { const d = JSON.parse(p.tool_input); input = d.command || d.file_path || truncate(p.tool_input); } catch { input = truncate(p.tool_input); }
+        return `<tr>
+          <td class="ts">${fmtTime(p.timestamp)}</td>
+          <td>${escapeHtml(p.tool_name)}</td>
+          <td title="${escapeHtml(p.tool_input || '')}">${escapeHtml(input)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+  if (tabId === 'blocked') {
+    const blocked = data.blocked || [];
+    if (blocked.length === 0) return '<p class="empty">No blocked actions</p>';
+    return `<table>
+      <thead><tr><th>Time</th><th>Tool</th><th>Rule</th><th>Input</th></tr></thead>
+      <tbody>${blocked.map(b => {
+        let input = '-';
+        try { const d = JSON.parse(b.tool_input); input = d.command || d.file_path || truncate(b.tool_input); } catch { input = truncate(b.tool_input); }
+        return `<tr>
+          <td class="ts">${fmtTime(b.timestamp)}</td>
+          <td>${escapeHtml(b.tool_name)}</td>
+          <td><span class="badge blocked">${escapeHtml(b.reason || b.rule_matched || '')}</span></td>
+          <td title="${escapeHtml(b.tool_input || '')}">${escapeHtml(input)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+  return '';
+}
+
+function closeModal() {
+  openModalSessionId = null;
+  const el = document.getElementById('session-modal');
+  if (el) el.remove();
+}
+
+// Close modal on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// --- Filter debounce ---
+let toolSearchTimeout = null;
+document.getElementById('tool-search').addEventListener('input', () => {
+  if (toolSearchTimeout) clearTimeout(toolSearchTimeout);
+  toolSearchTimeout = setTimeout(() => refreshToolCalls(), 300);
+});
+document.getElementById('tool-name-filter').addEventListener('change', () => refreshToolCalls());
+document.getElementById('project-filter').addEventListener('change', () => refreshSessions());
+
+async function refreshToolCalls() {
+  const toolName = document.getElementById('tool-name-filter').value;
+  const search = document.getElementById('tool-search').value;
+  let url = `${API}/api/tool-calls?limit=50`;
+  if (toolName) url += `&tool_name=${encodeURIComponent(toolName)}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  const calls = await fetchJSON(url);
+  renderToolCalls(calls);
+}
+
+async function refreshSessions() {
+  const project = document.getElementById('project-filter').value;
+  let url = `${API}/api/sessions?limit=20`;
+  if (project) url += `&project=${encodeURIComponent(project)}`;
+  const sessions = await fetchJSON(url);
+  renderSessions(sessions);
+}
+
+// --- Main refresh ---
 async function refresh() {
   const days = document.getElementById('time-range').value;
+  const project = document.getElementById('project-filter').value;
+  const toolName = document.getElementById('tool-name-filter').value;
+  const search = document.getElementById('tool-search').value;
+
+  let sessionsUrl = `${API}/api/sessions?limit=20`;
+  if (project) sessionsUrl += `&project=${encodeURIComponent(project)}`;
+
+  let toolCallsUrl = `${API}/api/tool-calls?limit=50`;
+  if (toolName) toolCallsUrl += `&tool_name=${encodeURIComponent(toolName)}`;
+  if (search) toolCallsUrl += `&search=${encodeURIComponent(search)}`;
+
   const [stats, sessions, calls, perms, blocked] = await Promise.all([
     fetchJSON(`${API}/api/stats?days=${days}`),
-    fetchJSON(`${API}/api/sessions?limit=20`),
-    fetchJSON(`${API}/api/tool-calls?limit=50`),
+    fetchJSON(sessionsUrl),
+    fetchJSON(toolCallsUrl),
     fetchJSON(`${API}/api/permissions?limit=30`),
     fetchJSON(`${API}/api/blocked?limit=30`),
   ]);
   renderStats(stats);
+  renderModelBreakdown(stats);
   renderToolChart(stats);
+  renderCostChart(stats);
   renderSessions(sessions);
   renderToolCalls(calls);
   renderPermissions(perms);
