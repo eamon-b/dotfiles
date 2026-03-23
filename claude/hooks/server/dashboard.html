@@ -428,8 +428,9 @@ function renderCostChart(stats) {
     const y = marginTop + plotHeight - barH;
     bars += `<rect class="bar-rect" x="${x}" y="${y}" width="${barWidth}" height="${barH}" rx="2"><title>${escapeHtml(d.date)}: ${fmtCost(d.cost)}</title></rect>`;
     if (i % labelEvery === 0) {
-      const labelDate = d.date.slice(5);
-      labels += `<text class="axis-label" x="${x + barWidth/2}" y="${chartHeight - 5}" text-anchor="middle" transform="rotate(-45 ${x + barWidth/2} ${chartHeight - 10})">${escapeHtml(labelDate)}</text>`;
+      const [, mm, dd] = d.date.split('-');
+      const labelDate = `${dd}-${mm}`;
+      labels += `<text class="axis-label" x="${x + barWidth/2}" y="${marginTop + plotHeight + 14}" text-anchor="middle">${escapeHtml(labelDate)}</text>`;
     }
   });
 
