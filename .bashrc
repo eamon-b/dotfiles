@@ -194,6 +194,9 @@ alias prestart='podman-compose restart'
 
 export PYTHONDONTWRITEBYTECODE=1  # No .pyc files
 export PYTHONUNBUFFERED=1         # Unbuffered output
+export UV_CACHE_DIR="/mnt/data/.cache/uv"
+export UV_PYTHON_INSTALL_DIR="/mnt/data/.local/share/uv/python"
+export PIP_CACHE_DIR="/mnt/data/.cache/pip"
 
 alias py='python3'
 alias pip='uv pip'
@@ -317,6 +320,21 @@ if command -v bat &>/dev/null; then
     alias cat='bat --paging=never'
     alias catp='bat'
     export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+    # Copy file contents (plain, no bat decorations) to clipboard
+    # Usage: yank file.txt            (whole file)
+    #        yank file.txt 10 20      (lines 10-20)
+    yank() {
+        if [[ -z "$1" ]]; then
+            echo "Usage: yank <file> [start_line end_line]"
+            return 1
+        fi
+        if [[ -n "$2" && -n "$3" ]]; then
+            bat --plain --style=plain -r "$2:$3" "$1" | xclip -selection clipboard
+        else
+            bat --plain --style=plain "$1" | xclip -selection clipboard
+        fi
+        echo "Copied to clipboard."
+    }
 fi
 
 # eza as ls replacement (with fallbacks)

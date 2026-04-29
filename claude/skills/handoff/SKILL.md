@@ -71,4 +71,18 @@ Any relevant commands, environment setup, or configuration:
 - Don't include dead ends that aren't instructive
 - Prioritize the "Recommended Next Steps" section - this is the most important part
 
-Write the handoff file, then confirm to the user what was created and where.
+## For ephemeral/sandbox environments
+
+If the working directory may not persist between sessions (typical when working from the Claude mobile app against a remote sandbox), also push the handoff somewhere durable:
+
+- If a PR is open for this work: `gh pr comment <number> --body-file HANDOFF.md`
+- Otherwise: `gh gist create -d "Handoff: <short title>" HANDOFF.md`
+
+Capture the resulting URL.
+
+## On Completion
+
+Print a 3-bullet summary in chat (don't echo the full handoff content):
+- What's done
+- What's next (top 1-2 actions)
+- Where the handoff lives — file path and, if pushed, the gist or PR-comment URL

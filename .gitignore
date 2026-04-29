@@ -3,3 +3,4 @@ claude/hooks/server/.venv/
 claude/hooks/server/.pid
 claude/hooks/server/__pycache__/
 *.pyc
+.claude/settings.local.json

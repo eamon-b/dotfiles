@@ -4,7 +4,12 @@ description: Review the implementation against the plan to verify correctness
 argument-hint: "[path-to-plan-file]"
 ---
 
-Review the implementation against the plan at: $ARGUMENTS
+Review the implementation against the plan.
+
+**Resolve the plan path:**
+- If `$ARGUMENTS` is non-empty, use that path.
+- Otherwise, run `ls -t PLAN-*.md 2>/dev/null | head -1` to find the most recent plan in the current directory.
+- If no plan is found, ask the user for the path and stop.
 
 ## Review Process
 

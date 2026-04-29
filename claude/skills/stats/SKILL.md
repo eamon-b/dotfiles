@@ -1,6 +1,6 @@
 ---
 name: stats
-description: Show Claude Code usage statistics from the hooks server dashboard
+description: Show Claude Code usage statistics from the local hooks server. LOCAL ONLY — the server runs on the user's local machine at localhost:6271 and is not reachable from remote sandboxes. Skip this skill from a mobile/remote session.
 argument-hint: "[days - default 7]"
 allowed-tools: Bash(curl *)
 ---

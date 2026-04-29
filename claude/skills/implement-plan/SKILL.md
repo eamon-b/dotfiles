@@ -4,7 +4,12 @@ description: Implement a plan by following its steps
 argument-hint: "[path-to-plan-file]"
 ---
 
-Implement the plan located at: $ARGUMENTS
+Implement an existing plan.
+
+**Resolve the plan path:**
+- If `$ARGUMENTS` is non-empty, use that path.
+- Otherwise, run `ls -t PLAN-*.md 2>/dev/null | head -1` to find the most recent plan in the current directory.
+- If no plan is found, ask the user for the path and stop.
 
 ## Implementation Process
 

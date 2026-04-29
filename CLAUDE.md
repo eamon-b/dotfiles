@@ -8,11 +8,25 @@ This is a personal dotfiles repository for Fedora/Linux development environments
 
 ## Installation
 
+### Local machine
+
 ```bash
 ./install.sh
 ```
 
 This backs up existing files to `~/.dotfiles_backup/`, copies configurations to their target locations, sets up the hooks server virtualenv, and enables the systemd service. After installation, run `source ~/.bashrc` or restart your shell.
+
+### Claude Code cloud sandbox (mobile-app workflow)
+
+For the cloud environment behind `claude.ai/code` / the Claude mobile app, use `setup-sandbox.sh` instead. Paste this into the environment's **Setup script** field:
+
+```bash
+curl -sf https://raw.githubusercontent.com/eamon-b/dotfiles/main/setup-sandbox.sh | bash
+```
+
+The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and `.bashrc` (none of which are useful in a cloud container) and uses `claude/settings.sandbox.json` — same permissions, but no `localhost:6271` hooks. It installs the Claude skills, the `format-on-edit` and `post-compact` hooks, gitconfig, and editorconfig.
+
+**Adding files to the sandbox install:** if a file in `install.sh` should also be present in the cloud sandbox, add it to `setup-sandbox.sh` too. Things to deliberately skip: anything depending on systemd, the local hooks server, desktop notifications, or terminal emulators.
 
 ## Repository Structure
 
@@ -77,9 +91,12 @@ The settings use an aggressive allow/deny model:
 | `/commit-push-pr` | Stage, commit, push, and create PR |
 | `/test-and-fix` | Run tests, fix failures, iterate until green |
 | `/grill` | Adversarial code review |
-| `/worktree` | Create git worktree for parallel sessions |
+| `/ship-it` | End-to-end small change: implement → verify → commit → PR (phone-friendly) |
+| `/sitrep` | Mobile-readable status report: branch, uncommitted, your PRs, CI, review-requested |
+| `/address-comments` | Pull PR review comments, address each, push (phone-friendly) |
+| `/worktree` | Create git worktree for parallel sessions (local dev only) |
 | `/deploy-preview` | Check Vercel preview deployment status |
-| `/stats` | Show usage statistics from hooks server |
+| `/stats` | Show usage statistics from hooks server (local machine only) |
 
 ## Bash Customizations
 

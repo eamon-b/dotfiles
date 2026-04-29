@@ -53,4 +53,11 @@ How to verify the implementation works correctly.
 Potential issues or edge cases to watch for.
 ```
 
-Write the plan file, then tell the user the filename and summarize what you've created.
+After writing the plan file, **report in chat** (keep under 15 lines so it's readable on a phone):
+
+- The filename
+- A 3-5 bullet summary of the plan
+- Estimated size: **S** (≤5 files, no design decisions), **M**, or **L**
+- If size is **S**, suggest `/ship-it` may be a faster end-to-end alternative
+
+Don't echo the full plan in chat — the file has it.

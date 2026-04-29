@@ -1,6 +1,6 @@
 ---
 name: worktree
-description: Create a git worktree for parallel Claude Code sessions
+description: Create a git worktree on the local filesystem for parallel Claude Code sessions. LOCAL DEV ONLY — the worktree lives next to the user's local repo and is not useful from a mobile/remote sandbox.
 argument-hint: "<branch-name> [base-branch]"
 ---
 
