@@ -188,6 +188,7 @@ tr.clickable:hover td { background: rgba(88,166,255,0.08); }
 }
 .token-card .label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
 .token-card .value { font-size: 18px; font-weight: 700; }
+.token-card .cost { font-size: 11px; color: var(--yellow); font-weight: 600; margin-top: 2px; }
 .modal-tab-content { max-height: 400px; overflow-y: auto; }
 </style>
 </head>
@@ -224,9 +225,15 @@ tr.clickable:hover td { background: rgba(88,166,255,0.08); }
       <div id="tool-chart"><p class="empty">Loading...</p></div>
     </div>
   </div>
-  <div class="card">
-    <h2>Daily Cost</h2>
-    <div class="cost-chart" id="cost-chart"><p class="empty">Loading...</p></div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>Daily Cost</h2>
+      <div class="cost-chart" id="cost-chart"><p class="empty">Loading...</p></div>
+    </div>
+    <div class="card">
+      <h2>Cost Breakdown</h2>
+      <div id="cost-breakdown"><p class="empty">Loading...</p></div>
+    </div>
   </div>
   <div class="card">
     <h2>Recent Tool Calls</h2>
@@ -287,6 +294,14 @@ function fmtTime(iso) {
 }
 
 function fmtCost(v) { return '$' + (v || 0).toFixed(2); }
+
+// More precision for small per-category amounts (cache reads are cheap).
+function fmtCostFull(v) {
+  v = v || 0;
+  if (v >= 1) return '$' + v.toFixed(2);
+  if (v >= 0.01) return '$' + v.toFixed(3);
+  return '$' + v.toFixed(4);
+}
 
 function fmtDuration(started, ended) {
   if (!started || !ended) return '-';
@@ -445,6 +460,31 @@ function renderCostChart(stats) {
   }
 
   el.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="xMidYMid meet">${yLabels}${bars}${labels}</svg>`;
+}
+
+function renderCostBreakdown(stats) {
+  const el = document.getElementById('cost-breakdown');
+  const cb = stats && stats.cost_breakdown;
+  const tt = (stats && stats.token_totals) || {};
+  if (!cb) { el.innerHTML = '<p class="empty">No cost data</p>'; return; }
+  const rows = [
+    { key: 'input', label: 'Input', color: 'var(--accent)' },
+    { key: 'output', label: 'Output', color: 'var(--purple)' },
+    { key: 'cache_write', label: 'Cache Write', color: 'var(--yellow)' },
+    { key: 'cache_read', label: 'Cache Read', color: 'var(--green)' },
+  ];
+  const total = rows.reduce((s, r) => s + (cb[r.key] || 0), 0);
+  if (total <= 0) { el.innerHTML = '<p class="empty">No cost yet</p>'; return; }
+  el.innerHTML = '<div class="bar-chart">' + rows.map(r => {
+    const cost = cb[r.key] || 0;
+    const pct = total > 0 ? (cost / total * 100) : 0;
+    const toks = fmtTokens(tt[r.key] || 0);
+    return `<div class="bar-row">
+      <span class="bar-label" title="${r.label}">${r.label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(pct, 1)}%;background:${r.color}">${pct >= 8 ? pct.toFixed(0) + '%' : ''}</div></div>
+      <span class="bar-count">${fmtCostFull(cost)} · ${toks} tok</span>
+    </div>`;
+  }).join('') + `</div><div style="margin-top:10px;font-size:11px;color:var(--text-dim);">Total ${fmtCostFull(total)} · cache reads billed at ~10% of input, writes at 125%.</div>`;
 }
 
 function renderSessions(sessions) {
@@ -608,18 +648,22 @@ async function openSessionModal(sessionId) {
         <div class="token-card">
           <div class="label">Input Tokens</div>
           <div class="value">${fmtTokens(s.input_tokens)}</div>
+          <div class="cost">${fmtCostFull(s.input_cost)}</div>
         </div>
         <div class="token-card">
           <div class="label">Output Tokens</div>
           <div class="value">${fmtTokens(s.output_tokens)}</div>
+          <div class="cost">${fmtCostFull(s.output_cost)}</div>
         </div>
         <div class="token-card">
           <div class="label">Cache Read</div>
           <div class="value">${fmtTokens(s.cache_read_tokens)}</div>
+          <div class="cost">${fmtCostFull(s.cache_read_cost)}</div>
         </div>
         <div class="token-card">
           <div class="label">Cache Write</div>
           <div class="value">${fmtTokens(s.cache_write_tokens)}</div>
+          <div class="cost">${fmtCostFull(s.cache_write_cost)}</div>
         </div>
       </div>
       <div class="modal-tabs">
@@ -773,6 +817,7 @@ async function refresh() {
   renderModelBreakdown(stats);
   renderToolChart(stats);
   renderCostChart(stats);
+  renderCostBreakdown(stats);
   renderSessions(sessions);
   renderToolCalls(calls);
   renderPermissions(perms);

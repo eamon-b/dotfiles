@@ -38,13 +38,77 @@ SECURITY_RULES_PATH = Path(
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 PORT = int(os.environ.get("CLAUDE_HOOKS_PORT", 6271))
 
-# Anthropic published pricing (USD per million tokens)
-PRICING = {
-    "claude-opus-4": {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.50},
-    "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
-    "claude-haiku-4": {"input": 0.25, "output": 1.25, "cache_write": 0.30, "cache_read": 0.025},
-    "default": {"input": 3.0, "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
-}
+# Anthropic published pricing (USD per million tokens).
+# cache_write is 1.25x input (5-minute TTL), cache_read is 0.1x input.
+def _prices(inp: float, out: float) -> dict:
+    return {
+        "input": inp,
+        "output": out,
+        "cache_write": round(inp * 1.25, 4),
+        "cache_read": round(inp * 0.10, 4),
+    }
+
+
+_FABLE = _prices(10.0, 50.0)         # Fable 5 / Mythos 5
+_OPUS_CURRENT = _prices(5.0, 25.0)   # Opus 4.5 / 4.6 / 4.7 / 4.8
+_OPUS_LEGACY = _prices(15.0, 75.0)   # Opus 3 / 4.0 / 4.1
+_SONNET = _prices(3.0, 15.0)         # all Sonnet generations
+_HAIKU_CURRENT = _prices(1.0, 5.0)   # Haiku 4.5
+_HAIKU_LEGACY = _prices(0.8, 4.0)    # Haiku 3.5 (Haiku 3 was cheaper; close enough)
+
+DEFAULT_PRICING = _SONNET
+
+# Ordered (substring, prices) matchers — first hit wins, so most-specific first.
+# Substrings are chosen to match both new (`claude-opus-4-8`) and old
+# (`claude-3-5-sonnet-20241022`) model-id formats.
+MODEL_PRICING = [
+    ("fable", _FABLE),
+    ("mythos", _FABLE),
+    ("opus-4-8", _OPUS_CURRENT),
+    ("opus-4-7", _OPUS_CURRENT),
+    ("opus-4-6", _OPUS_CURRENT),
+    ("opus-4-5", _OPUS_CURRENT),
+    ("opus", _OPUS_LEGACY),          # Opus 3 / 4.0 / 4.1
+    ("sonnet", _SONNET),             # every Sonnet is $3 / $15
+    ("haiku-4", _HAIKU_CURRENT),     # Haiku 4.5
+    ("haiku", _HAIKU_LEGACY),        # Haiku 3 / 3.5
+]
+
+
+def price_for_model(model: str) -> dict:
+    """Per-1M-token price table for a model id (first substring match wins)."""
+    for substring, model_prices in MODEL_PRICING:
+        if substring in model:
+            return model_prices
+    return DEFAULT_PRICING
+
+
+def cost_from_tokens(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_write_tokens: int,
+    cache_read_tokens: int,
+) -> dict:
+    """Cost breakdown (USD) for token totals under a single model's pricing.
+
+    Used by the backfill fallback path when a transcript is unavailable; the
+    live path (estimate_cost_detailed) prices per-message so it stays exact for
+    sessions that mix models (e.g. a Haiku subagent under an Opus main loop).
+    """
+    p = price_for_model(model)
+    ci = input_tokens * p["input"] / 1_000_000
+    co = output_tokens * p["output"] / 1_000_000
+    ccw = cache_write_tokens * p["cache_write"] / 1_000_000
+    ccr = cache_read_tokens * p["cache_read"] / 1_000_000
+    return {
+        "cost": round(ci + co + ccw + ccr, 6),
+        "cost_input": round(ci, 6),
+        "cost_output": round(co, 6),
+        "cost_cache_write": round(ccw, 6),
+        "cost_cache_read": round(ccr, 6),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Database schema & migrations
@@ -68,7 +132,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     input_tokens  INTEGER DEFAULT 0,
     output_tokens INTEGER DEFAULT 0,
     cache_write_tokens INTEGER DEFAULT 0,
-    cache_read_tokens INTEGER DEFAULT 0
+    cache_read_tokens INTEGER DEFAULT 0,
+    input_cost REAL DEFAULT 0.0,
+    output_cost REAL DEFAULT 0.0,
+    cache_write_cost REAL DEFAULT 0.0,
+    cache_read_cost REAL DEFAULT 0.0
 );
 
 CREATE TABLE IF NOT EXISTS tool_calls (
@@ -135,6 +203,10 @@ MIGRATIONS = [
     ("sessions", "output_tokens", "ALTER TABLE sessions ADD COLUMN output_tokens INTEGER DEFAULT 0"),
     ("sessions", "cache_write_tokens", "ALTER TABLE sessions ADD COLUMN cache_write_tokens INTEGER DEFAULT 0"),
     ("sessions", "cache_read_tokens", "ALTER TABLE sessions ADD COLUMN cache_read_tokens INTEGER DEFAULT 0"),
+    ("sessions", "input_cost", "ALTER TABLE sessions ADD COLUMN input_cost REAL DEFAULT 0.0"),
+    ("sessions", "output_cost", "ALTER TABLE sessions ADD COLUMN output_cost REAL DEFAULT 0.0"),
+    ("sessions", "cache_write_cost", "ALTER TABLE sessions ADD COLUMN cache_write_cost REAL DEFAULT 0.0"),
+    ("sessions", "cache_read_cost", "ALTER TABLE sessions ADD COLUMN cache_read_cost REAL DEFAULT 0.0"),
     ("tool_calls", "tool_output", "ALTER TABLE tool_calls ADD COLUMN tool_output TEXT"),
 ]
 
@@ -208,9 +280,18 @@ def check_security(tool_name: str, tool_input: dict) -> tuple[bool, str | None]:
 
 
 def estimate_cost_detailed(transcript_path: str | None) -> dict:
-    """Returns {cost, model, input_tokens, output_tokens, cache_write_tokens, cache_read_tokens}."""
+    """Parse a transcript and return cost, per-category cost breakdown, token
+    totals, and the dominant model.
+
+    Pricing is applied per message, so sessions that mix models (e.g. a Haiku
+    subagent inside an Opus loop) are costed correctly.
+    """
     defaults = {
         "cost": 0.0,
+        "cost_input": 0.0,
+        "cost_output": 0.0,
+        "cost_cache_write": 0.0,
+        "cost_cache_read": 0.0,
         "model": "",
         "input_tokens": 0,
         "output_tokens": 0,
@@ -218,16 +299,13 @@ def estimate_cost_detailed(transcript_path: str | None) -> dict:
         "cache_read_tokens": 0,
     }
     if not transcript_path:
-        return defaults
+        return dict(defaults)
     path = Path(transcript_path)
     if not path.exists():
-        return defaults
+        return dict(defaults)
 
-    total_cost = 0.0
-    total_input = 0
-    total_output = 0
-    total_cache_write = 0
-    total_cache_read = 0
+    tok = {"input_tokens": 0, "output_tokens": 0, "cache_write_tokens": 0, "cache_read_tokens": 0}
+    cost = {"cost_input": 0.0, "cost_output": 0.0, "cost_cache_write": 0.0, "cost_cache_read": 0.0}
     model_counts: Counter = Counter()
 
     try:
@@ -246,38 +324,32 @@ def estimate_cost_detailed(transcript_path: str | None) -> dict:
                 model = msg.get("model", "")
                 if model:
                     model_counts[model] += 1
-                pricing_key = "default"
-                for key in PRICING:
-                    if key != "default" and key in model:
-                        pricing_key = key
-                        break
-                prices = PRICING[pricing_key]
+                prices = price_for_model(model)
                 inp = usage.get("input_tokens", 0)
                 cache_write = usage.get("cache_creation_input_tokens", 0)
                 cache_read = usage.get("cache_read_input_tokens", 0)
                 out = usage.get("output_tokens", 0)
-                total_input += inp
-                total_output += out
-                total_cache_write += cache_write
-                total_cache_read += cache_read
-                total_cost += (
-                    inp * prices["input"]
-                    + cache_write * prices["cache_write"]
-                    + cache_read * prices["cache_read"]
-                    + out * prices["output"]
-                ) / 1_000_000
+                tok["input_tokens"] += inp
+                tok["output_tokens"] += out
+                tok["cache_write_tokens"] += cache_write
+                tok["cache_read_tokens"] += cache_read
+                cost["cost_input"] += inp * prices["input"] / 1_000_000
+                cost["cost_output"] += out * prices["output"] / 1_000_000
+                cost["cost_cache_write"] += cache_write * prices["cache_write"] / 1_000_000
+                cost["cost_cache_read"] += cache_read * prices["cache_read"] / 1_000_000
     except Exception:
         pass
 
     most_common_model = model_counts.most_common(1)[0][0] if model_counts else ""
 
     return {
-        "cost": round(total_cost, 4),
+        "cost": round(sum(cost.values()), 6),
+        "cost_input": round(cost["cost_input"], 6),
+        "cost_output": round(cost["cost_output"], 6),
+        "cost_cache_write": round(cost["cost_cache_write"], 6),
+        "cost_cache_read": round(cost["cost_cache_read"], 6),
         "model": most_common_model,
-        "input_tokens": total_input,
-        "output_tokens": total_output,
-        "cache_write_tokens": total_cache_write,
-        "cache_read_tokens": total_cache_read,
+        **tok,
     }
 
 
@@ -293,15 +365,36 @@ async def _aggregate_daily_stats(db: aiosqlite.Connection, session: dict):
     date = started[:10]
     project = session.get("project", "unknown") or "unknown"
     model = session.get("model", "") or ""
-    cost = session.get("estimated_cost_usd", 0.0) or 0.0
-    tool_calls_count = session.get("tool_call_count", 0) or 0
-    prompt_count = session.get("prompt_count", 0) or 0
-    sid = session.get("session_id", "")
 
+    # Recompute the whole (date, project, model) bucket from the sessions table
+    # rather than incrementing. Stop fires once per turn, so an incremental
+    # update double-counts a session's cumulative cost on every turn; sessions
+    # are the source of truth and are never deleted, so a full recompute is
+    # both correct and idempotent under repeated Stop/TaskCompleted events.
+    key = (date, project, model)
+    async with db.execute(
+        """SELECT COUNT(*), COALESCE(SUM(estimated_cost_usd),0),
+                  COALESCE(SUM(tool_call_count),0), COALESCE(SUM(prompt_count),0)
+           FROM sessions
+           WHERE substr(started_at,1,10)=?
+             AND COALESCE(NULLIF(project,''),'unknown')=?
+             AND COALESCE(model,'')=?""",
+        key,
+    ) as cur:
+        sessions_count, cost, tool_calls_count, prompt_count = await cur.fetchone()
+
+    # failure_count and the per-tool breakdown come from tool_calls (no durable
+    # per-session counter). Recent buckets always have their rows; old buckets
+    # are aggregated once by the cleanup pass before their tool_calls are pruned.
     failure_count = 0
     tool_bd: dict = {}
     async with db.execute(
-        "SELECT tool_name, success FROM tool_calls WHERE session_id=?", (sid,)
+        """SELECT tc.tool_name, tc.success FROM tool_calls tc
+           JOIN sessions s ON s.session_id = tc.session_id
+           WHERE substr(s.started_at,1,10)=?
+             AND COALESCE(NULLIF(s.project,''),'unknown')=?
+             AND COALESCE(s.model,'')=?""",
+        key,
     ) as cur:
         async for row in cur:
             name, success = row[0], row[1]
@@ -311,15 +404,15 @@ async def _aggregate_daily_stats(db: aiosqlite.Connection, session: dict):
 
     await db.execute(
         """INSERT INTO daily_stats (date, project, model, sessions_count, tool_calls_count, prompt_count, failure_count, cost, tool_breakdown)
-           VALUES (?,?,?,1,?,?,?,?,?)
+           VALUES (?,?,?,?,?,?,?,?,?)
            ON CONFLICT(date, project, model) DO UPDATE SET
-             sessions_count = sessions_count + 1,
-             tool_calls_count = tool_calls_count + excluded.tool_calls_count,
-             prompt_count = prompt_count + excluded.prompt_count,
-             failure_count = failure_count + excluded.failure_count,
-             cost = cost + excluded.cost,
+             sessions_count = excluded.sessions_count,
+             tool_calls_count = excluded.tool_calls_count,
+             prompt_count = excluded.prompt_count,
+             failure_count = excluded.failure_count,
+             cost = excluded.cost,
              tool_breakdown = excluded.tool_breakdown""",
-        (date, project, model, tool_calls_count, prompt_count, failure_count, cost, json.dumps(tool_bd)),
+        (date, project, model, sessions_count, tool_calls_count, prompt_count, failure_count, cost, json.dumps(tool_bd)),
     )
     await db.commit()
 
@@ -545,11 +638,13 @@ async def stop(request: Request):
     now = _now()
     await db.execute(
         """UPDATE sessions SET status='stopped', last_activity=?, estimated_cost_usd=?,
-           model=?, input_tokens=?, output_tokens=?, cache_write_tokens=?, cache_read_tokens=?
+           model=?, input_tokens=?, output_tokens=?, cache_write_tokens=?, cache_read_tokens=?,
+           input_cost=?, output_cost=?, cache_write_cost=?, cache_read_cost=?
            WHERE session_id=?""",
         (now, details["cost"], details["model"], details["input_tokens"],
          details["output_tokens"], details["cache_write_tokens"],
-         details["cache_read_tokens"], sid),
+         details["cache_read_tokens"], details["cost_input"], details["cost_output"],
+         details["cost_cache_write"], details["cost_cache_read"], sid),
     )
     await db.commit()
 
@@ -576,10 +671,16 @@ async def subagent_stop(request: Request):
            input_tokens=input_tokens+?,
            output_tokens=output_tokens+?,
            cache_write_tokens=cache_write_tokens+?,
-           cache_read_tokens=cache_read_tokens+?
+           cache_read_tokens=cache_read_tokens+?,
+           input_cost=input_cost+?,
+           output_cost=output_cost+?,
+           cache_write_cost=cache_write_cost+?,
+           cache_read_cost=cache_read_cost+?
            WHERE session_id=?""",
         (now, details["cost"], details["input_tokens"], details["output_tokens"],
-         details["cache_write_tokens"], details["cache_read_tokens"], sid),
+         details["cache_write_tokens"], details["cache_read_tokens"],
+         details["cost_input"], details["cost_output"],
+         details["cost_cache_write"], details["cost_cache_read"], sid),
     )
     if details["model"]:
         await db.execute(
@@ -601,11 +702,13 @@ async def task_completed(request: Request):
     now = _now()
     await db.execute(
         """UPDATE sessions SET status='completed', last_activity=?, estimated_cost_usd=?,
-           model=?, input_tokens=?, output_tokens=?, cache_write_tokens=?, cache_read_tokens=?
+           model=?, input_tokens=?, output_tokens=?, cache_write_tokens=?, cache_read_tokens=?,
+           input_cost=?, output_cost=?, cache_write_cost=?, cache_read_cost=?
            WHERE session_id=?""",
         (now, details["cost"], details["model"], details["input_tokens"],
          details["output_tokens"], details["cache_write_tokens"],
-         details["cache_read_tokens"], sid),
+         details["cache_read_tokens"], details["cost_input"], details["cost_output"],
+         details["cost_cache_write"], details["cost_cache_read"], sid),
     )
     await db.commit()
 
@@ -758,7 +861,19 @@ async def api_stats(request: Request, days: int = 7):
     cutoff = f"-{days} days"
 
     async with db.execute(
-        "SELECT COUNT(*) as total_sessions, COALESCE(SUM(tool_call_count),0) as total_tool_calls, COALESCE(SUM(prompt_count),0) as total_prompts, COALESCE(SUM(estimated_cost_usd),0) as total_cost FROM sessions WHERE started_at >= datetime('now', ?)",
+        """SELECT COUNT(*) as total_sessions,
+                  COALESCE(SUM(tool_call_count),0) as total_tool_calls,
+                  COALESCE(SUM(prompt_count),0) as total_prompts,
+                  COALESCE(SUM(estimated_cost_usd),0) as total_cost,
+                  COALESCE(SUM(input_tokens),0) as total_input_tokens,
+                  COALESCE(SUM(output_tokens),0) as total_output_tokens,
+                  COALESCE(SUM(cache_write_tokens),0) as total_cache_write_tokens,
+                  COALESCE(SUM(cache_read_tokens),0) as total_cache_read_tokens,
+                  COALESCE(SUM(input_cost),0) as cost_input,
+                  COALESCE(SUM(output_cost),0) as cost_output,
+                  COALESCE(SUM(cache_write_cost),0) as cost_cache_write,
+                  COALESCE(SUM(cache_read_cost),0) as cost_cache_read
+           FROM sessions WHERE started_at >= datetime('now', ?)""",
         (cutoff,),
     ) as cur:
         overall = dict(await cur.fetchone())
@@ -815,6 +930,18 @@ async def api_stats(request: Request, days: int = 7):
         "tool_breakdown": tool_breakdown,
         "daily_activity": daily,
         "model_breakdown": model_breakdown,
+        "cost_breakdown": {
+            "input": overall.get("cost_input", 0) or 0,
+            "output": overall.get("cost_output", 0) or 0,
+            "cache_write": overall.get("cost_cache_write", 0) or 0,
+            "cache_read": overall.get("cost_cache_read", 0) or 0,
+        },
+        "token_totals": {
+            "input": overall.get("total_input_tokens", 0) or 0,
+            "output": overall.get("total_output_tokens", 0) or 0,
+            "cache_write": overall.get("total_cache_write_tokens", 0) or 0,
+            "cache_read": overall.get("total_cache_read_tokens", 0) or 0,
+        },
     }
 
 

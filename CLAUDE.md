@@ -60,7 +60,8 @@ A local FastAPI server at `http://localhost:6271` that receives all hook events 
 **Tracked events:** PreToolUse, PostToolUse, PostToolUseFailure, PermissionRequest, UserPromptSubmit, Stop, SubagentStop, TaskCompleted.
 
 **Features:**
-- Session tracking with cost estimation (Anthropic published pricing)
+- Session tracking with cost estimation (Anthropic published pricing — see `MODEL_PRICING` in `app.py`)
+- Per-category cost breakdown (input / output / cache-write / cache-read), shown on the dashboard and in the session drill-down
 - Full tool call audit log
 - Permission request history
 - PreToolUse security rules (`security-rules.json`) that block dangerous commands
@@ -69,6 +70,11 @@ A local FastAPI server at `http://localhost:6271` that receives all hook events 
 **Management:**
 ```bash
 claude-hooks start|stop|restart|status|logs|dashboard
+```
+
+**Maintenance:** after changing prices in `MODEL_PRICING`, recompute historical rows with the backfill (re-reads transcripts, falls back to stored token totals, and rebuilds `daily_stats`):
+```bash
+~/.claude/hooks/server/.venv/bin/python ~/.claude/hooks/server/backfill_costs.py [--dry-run]
 ```
 
 ## Permissions
