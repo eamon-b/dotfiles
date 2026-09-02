@@ -466,37 +466,6 @@ claude-hooks() {
     esac
 }
 
-# Create a git worktree for parallel Claude sessions
-claude-worktree() {
-    local branch="$1"
-    local base="${2:-$(git branch --show-current 2>/dev/null || echo main)}"
-
-    if [[ -z "$branch" ]]; then
-        echo "Usage: claude-worktree <branch-name> [base-branch]"
-        echo ""
-        echo "Active worktrees:"
-        git worktree list 2>/dev/null || echo "  Not in a git repo"
-        return 1
-    fi
-
-    local repo_name
-    repo_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
-    local worktree_path="../${repo_name}--${branch}"
-
-    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
-        git worktree add "$worktree_path" "$branch"
-    else
-        git worktree add "$worktree_path" -b "$branch" "$base"
-    fi
-
-    echo ""
-    echo "Worktree ready. To start a parallel Claude session:"
-    echo "  cd $worktree_path && claude"
-    echo ""
-    echo "To remove when done:"
-    echo "  git worktree remove $worktree_path"
-}
-
 # Enable command-in-title feature (must be at end of bashrc to avoid
 # firing during initialization, which causes stray characters in prompt)
 trap 'show_command_in_title' DEBUG

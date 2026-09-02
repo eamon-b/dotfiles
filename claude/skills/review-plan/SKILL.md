@@ -1,15 +1,20 @@
 ---
 name: review-plan
-description: Critique an implementation plan to verify it will achieve its goals
+description: Critique an implementation plan in .claude/plans/ to verify it will achieve its goals
 argument-hint: "[path-to-plan-file]"
+disable-model-invocation: true
 ---
 
 Review and critique an implementation plan.
 
 **Resolve the plan path:**
 - If `$ARGUMENTS` is non-empty, use that path.
-- Otherwise, run `ls -t PLAN-*.md 2>/dev/null | head -1` to find the most recent plan in the current directory.
+- Otherwise use the most recently modified file in `.claude/plans/`:
+  `ls -t .claude/plans/*.md 2>/dev/null | head -1`
 - If no plan is found, ask the user for the path and stop.
+
+The user may have edited the plan by hand since it was written. Review the
+file as it is now, not as you remember it.
 
 ## Review Process
 
@@ -31,11 +36,14 @@ Review and critique an implementation plan.
 
 ## Output
 
-After reviewing, update the plan file directly with:
+Update the plan file directly:
 
-1. Add a `## Review Notes` section at the end with your findings
-2. Modify any steps that need improvement
-3. Add any missing steps
-4. Update the risks section if you found new concerns
+1. Modify any steps that need improvement and add any missing steps (keep the
+   `- [ ]` checkbox format so `/implement-plan` can tick them)
+2. Update the risks section if you found new concerns
+3. Append a `## Review Notes` section (dated) at the end with your findings and
+   any open questions for the user
+4. Set `**Status:** reviewed`
 
-Summarize the key changes you made and any concerns that remain.
+Summarize the key changes you made and any concerns that remain, in under 15
+lines. The user may edit the plan again before implementing.

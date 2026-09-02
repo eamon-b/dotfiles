@@ -17,9 +17,11 @@ log() {
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# Read file path from stdin (Claude Code passes hook data as JSON via stdin)
+# Read file path from stdin. Claude Code posts the hook payload as JSON; for
+# Edit/Write the path lives at .tool_input.file_path (top-level .file_path is
+# kept as a fallback for manual invocation).
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .filePath // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .file_path // empty' 2>/dev/null)
 
 # Fallback: check if passed as argument
 if [[ -z "$FILE_PATH" && $# -gt 0 ]]; then

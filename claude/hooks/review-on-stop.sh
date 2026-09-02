@@ -1,65 +1,43 @@
 #!/bin/bash
-# Claude Code review-on-stop hook
-# Spawns a fresh Claude agent to review local changes after implementation
+# Claude Code review-on-stop hook (Stop event, synchronous)
 #
-# Activation: Set CLAUDE_REVIEW_ON_STOP=1 before running claude
-# Example: CLAUDE_REVIEW_ON_STOP=1 claude "implement feature X"
+# When enabled, the first time Claude tries to end a turn that leaves
+# uncommitted changes, this hook blocks the stop and asks Claude to run the
+# bundled /code-review skill on those changes and fix confirmed findings.
+# /code-review spawns fresh reviewer subagents, so the review still gets
+# "fresh eyes" without a detached `claude --print` process or a REVIEW.md.
+#
+# Activation: CLAUDE_REVIEW_ON_STOP=1 claude "implement feature X"
+#
+# Loop protection: Claude Code sets stop_hook_active=true when it is already
+# continuing because of a Stop hook, so we only ever block once per turn.
 
-# Exit early if not activated
-if [[ "$CLAUDE_REVIEW_ON_STOP" != "1" ]]; then
+if [[ "${CLAUDE_REVIEW_ON_STOP:-0}" != "1" ]]; then
     exit 0
 fi
 
-# Get the working directory from the hook context or use current
-WORK_DIR="${CLAUDE_WORKING_DIRECTORY:-$(pwd)}"
+INPUT=$(cat)
 
-# Check if we're in a git repo
+# Never block twice in a row.
+if [[ "$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" == "true" ]]; then
+    exit 0
+fi
+
+WORK_DIR=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+WORK_DIR="${WORK_DIR:-$(pwd)}"
+
 if ! git -C "$WORK_DIR" rev-parse --git-dir &>/dev/null; then
     exit 0
 fi
 
-# Check if there are any changes to review (staged, unstaged, or untracked)
-if git -C "$WORK_DIR" diff --quiet && git -C "$WORK_DIR" diff --cached --quiet; then
-    # No staged or unstaged changes, check for untracked files
-    if [[ -z "$(git -C "$WORK_DIR" ls-files --others --exclude-standard)" ]]; then
-        exit 0
-    fi
+# Nothing to review if the tree is clean (staged, unstaged, or untracked).
+if git -C "$WORK_DIR" diff --quiet && git -C "$WORK_DIR" diff --cached --quiet \
+   && [[ -z "$(git -C "$WORK_DIR" ls-files --others --exclude-standard)" ]]; then
+    exit 0
 fi
 
-# Unset the env var to prevent infinite loop when review agent stops
-export CLAUDE_REVIEW_ON_STOP=0
-
-# Build the review prompt
-REVIEW_PROMPT='Review the uncommitted local changes in this repository.
-
-Your task:
-1. Run `git diff` and `git diff --cached` to see all changes
-2. Run `git status` to see untracked files
-3. Review the changes for:
-   - Bugs or logic errors
-   - Security issues
-   - Missing error handling
-   - Obvious improvements
-
-4. For issues you are VERY confident about (clear bugs, typos, missing null checks, etc.):
-   - Fix them directly using the Edit tool
-   - Be conservative - only fix things that are clearly wrong
-
-5. Write a REVIEW.md file in the repository root with:
-   - A "Changes Made" section listing any fixes you applied (with file:line references)
-   - A "Suggestions" section for things that need human judgment or clarification
-   - A "Questions" section for anything unclear about the implementation intent
-
-Keep the review focused and actionable. Do not make stylistic changes or refactors.
-Do not add tests, documentation, or features - only review what was implemented.'
-
-# Launch the review agent in background
-# Using --print to make it non-interactive, output goes to terminal
-# Pass through --dangerously-skip-permissions if the parent session had it
-if [[ "$CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS" == "1" ]]; then
-    cd "$WORK_DIR" && claude --dangerously-skip-permissions --print "$REVIEW_PROMPT" &
-else
-    cd "$WORK_DIR" && claude --print "$REVIEW_PROMPT" &
-fi
-
+jq -n '{
+  decision: "block",
+  reason: "Before finishing: review the uncommitted changes in this repository with the bundled /code-review skill (medium effort). Fix findings you are confident are real bugs; leave stylistic suggestions alone. Then summarize what the review found and what you changed, and stop."
+}'
 exit 0

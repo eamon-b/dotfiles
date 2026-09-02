@@ -39,37 +39,45 @@ DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 PORT = int(os.environ.get("CLAUDE_HOOKS_PORT", 6271))
 
 # Anthropic published pricing (USD per million tokens).
-# cache_write is 1.25x input (5-minute TTL), cache_read is 0.1x input.
-def _prices(inp: float, out: float) -> dict:
+# Cache writes cost 1.25x input for the 5-minute TTL and 2x input for the
+# 1-hour TTL; cache reads are 0.1x input unless a model says otherwise.
+# The transcript's `usage.cache_creation` block says which TTL each write used.
+def _prices(inp: float, out: float, cache_read: float | None = None) -> dict:
     return {
         "input": inp,
         "output": out,
-        "cache_write": round(inp * 1.25, 4),
-        "cache_read": round(inp * 0.10, 4),
+        "cache_write_5m": round(inp * 1.25, 4),
+        "cache_write_1h": round(inp * 2.0, 4),
+        "cache_read": round(inp * 0.10, 4) if cache_read is None else cache_read,
     }
 
 
+_FABLE_5_1 = _prices(10.0, 50.0, cache_read=0.25)  # Fable 5.1 (cheaper cache reads)
 _FABLE = _prices(10.0, 50.0)         # Fable 5 / Mythos 5
-_OPUS_CURRENT = _prices(5.0, 25.0)   # Opus 4.5 / 4.6 / 4.7 / 4.8
+_OPUS_CURRENT = _prices(5.0, 25.0)   # Opus 5 / 4.5 / 4.6 / 4.7 / 4.8
 _OPUS_LEGACY = _prices(15.0, 75.0)   # Opus 3 / 4.0 / 4.1
-_SONNET = _prices(3.0, 15.0)         # all Sonnet generations
+_SONNET_5 = _prices(2.0, 10.0)       # Sonnet 5
+_SONNET = _prices(3.0, 15.0)         # Sonnet 3.x / 4.x
 _HAIKU_CURRENT = _prices(1.0, 5.0)   # Haiku 4.5
 _HAIKU_LEGACY = _prices(0.8, 4.0)    # Haiku 3.5 (Haiku 3 was cheaper; close enough)
 
 DEFAULT_PRICING = _SONNET
 
 # Ordered (substring, prices) matchers — first hit wins, so most-specific first.
-# Substrings are chosen to match both new (`claude-opus-4-8`) and old
+# Substrings are chosen to match both new (`claude-opus-5`) and old
 # (`claude-3-5-sonnet-20241022`) model-id formats.
 MODEL_PRICING = [
+    ("fable-5-1", _FABLE_5_1),
     ("fable", _FABLE),
     ("mythos", _FABLE),
+    ("opus-5", _OPUS_CURRENT),
     ("opus-4-8", _OPUS_CURRENT),
     ("opus-4-7", _OPUS_CURRENT),
     ("opus-4-6", _OPUS_CURRENT),
     ("opus-4-5", _OPUS_CURRENT),
     ("opus", _OPUS_LEGACY),          # Opus 3 / 4.0 / 4.1
-    ("sonnet", _SONNET),             # every Sonnet is $3 / $15
+    ("sonnet-5", _SONNET_5),
+    ("sonnet", _SONNET),             # Sonnet 3.x / 4.x
     ("haiku-4", _HAIKU_CURRENT),     # Haiku 4.5
     ("haiku", _HAIKU_LEGACY),        # Haiku 3 / 3.5
 ]
@@ -93,13 +101,15 @@ def cost_from_tokens(
     """Cost breakdown (USD) for token totals under a single model's pricing.
 
     Used by the backfill fallback path when a transcript is unavailable; the
-    live path (estimate_cost_detailed) prices per-message so it stays exact for
+    live path (estimate_session_cost) prices per-message so it stays exact for
     sessions that mix models (e.g. a Haiku subagent under an Opus main loop).
+    Stored token totals don't record the cache TTL, so cache writes are priced
+    at the 5-minute rate here (a lower bound if the session used the 1h TTL).
     """
     p = price_for_model(model)
     ci = input_tokens * p["input"] / 1_000_000
     co = output_tokens * p["output"] / 1_000_000
-    ccw = cache_write_tokens * p["cache_write"] / 1_000_000
+    ccw = cache_write_tokens * p["cache_write_5m"] / 1_000_000
     ccr = cache_read_tokens * p["cache_read"] / 1_000_000
     return {
         "cost": round(ci + co + ccw + ccr, 6),
@@ -230,7 +240,7 @@ def _now() -> str:
 
 
 def _truncate(obj, limit: int = 2000) -> str:
-    s = json.dumps(obj) if isinstance(obj, dict) else str(obj)
+    s = json.dumps(obj) if isinstance(obj, (dict, list)) else str(obj)
     return s[:limit]
 
 
@@ -325,17 +335,27 @@ def estimate_cost_detailed(transcript_path: str | None) -> dict:
                 if model:
                     model_counts[model] += 1
                 prices = price_for_model(model)
-                inp = usage.get("input_tokens", 0)
-                cache_write = usage.get("cache_creation_input_tokens", 0)
-                cache_read = usage.get("cache_read_input_tokens", 0)
-                out = usage.get("output_tokens", 0)
+                inp = usage.get("input_tokens", 0) or 0
+                cache_write = usage.get("cache_creation_input_tokens", 0) or 0
+                cache_read = usage.get("cache_read_input_tokens", 0) or 0
+                out = usage.get("output_tokens", 0) or 0
+                # Split cache writes by TTL: the 1h tier costs 2x input, the 5m
+                # tier 1.25x. Older transcripts lack the breakdown; treat those
+                # writes as 5m.
+                breakdown = usage.get("cache_creation") or {}
+                cw_1h = breakdown.get("ephemeral_1h_input_tokens", 0) or 0
+                cw_5m = breakdown.get("ephemeral_5m_input_tokens", 0) or 0
+                if not breakdown or (cw_1h + cw_5m) == 0:
+                    cw_5m, cw_1h = cache_write, 0
                 tok["input_tokens"] += inp
                 tok["output_tokens"] += out
                 tok["cache_write_tokens"] += cache_write
                 tok["cache_read_tokens"] += cache_read
                 cost["cost_input"] += inp * prices["input"] / 1_000_000
                 cost["cost_output"] += out * prices["output"] / 1_000_000
-                cost["cost_cache_write"] += cache_write * prices["cache_write"] / 1_000_000
+                cost["cost_cache_write"] += (
+                    cw_5m * prices["cache_write_5m"] + cw_1h * prices["cache_write_1h"]
+                ) / 1_000_000
                 cost["cost_cache_read"] += cache_read * prices["cache_read"] / 1_000_000
     except Exception:
         pass
@@ -351,6 +371,53 @@ def estimate_cost_detailed(transcript_path: str | None) -> dict:
         "model": most_common_model,
         **tok,
     }
+
+
+def subagent_transcripts(transcript_path: str | None) -> list[Path]:
+    """Subagent transcripts belonging to a main-session transcript.
+
+    Claude Code stores each subagent's conversation in its own file under
+    ``<project>/<session_id>/subagents/agent-*.jsonl`` (the main transcript
+    is ``<project>/<session_id>.jsonl``). Their usage is not mirrored into the
+    main transcript, so they must be priced separately.
+    """
+    if not transcript_path:
+        return []
+    main = Path(transcript_path)
+    session_id = main.stem
+    # A session resumed from a different cwd lives under more than one
+    # <project> dir, and each run's subagents land next to that run's
+    # transcript, so look across every project dir for this session id.
+    projects_root = main.parent.parent
+    found = set(main.with_suffix("").glob("subagents/*.jsonl"))
+    if session_id and session_id != "unknown" and projects_root.is_dir():
+        found.update(projects_root.glob(f"*/{session_id}/subagents/*.jsonl"))
+    return sorted(found)
+
+
+def estimate_session_cost(transcript_path: str | None) -> dict:
+    """Total cost for a session: the main transcript plus every subagent
+    transcript that hangs off it. Same shape as estimate_cost_detailed.
+
+    Recomputed from scratch on every call so that Stop, SubagentStop and
+    TaskCompleted can all write it idempotently (no incremental double counts).
+    """
+    total = estimate_cost_detailed(transcript_path)
+    model_counts: Counter = Counter()
+    if total["model"]:
+        model_counts[total["model"]] += 1
+    for sub in subagent_transcripts(transcript_path):
+        part = estimate_cost_detailed(str(sub))
+        for key in (
+            "cost", "cost_input", "cost_output", "cost_cache_write", "cost_cache_read",
+            "input_tokens", "output_tokens", "cache_write_tokens", "cache_read_tokens",
+        ):
+            total[key] += part[key]
+    for key in ("cost", "cost_input", "cost_output", "cost_cache_write", "cost_cache_read"):
+        total[key] = round(total[key], 6)
+    # Keep the main transcript's dominant model as the session model; subagents
+    # frequently run on a cheaper model and shouldn't relabel the session.
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -557,7 +624,9 @@ async def post_tool_use(request: Request):
     data = await request.json()
     sid = data.get("session_id", "unknown")
     db = request.app.state.db
-    tool_output = _truncate(data.get("tool_output", ""), 1000)
+    # Claude Code sends the tool result as `tool_response`; older builds used
+    # `tool_output`. Stored in the `tool_output` column either way.
+    tool_output = _truncate(data.get("tool_response", data.get("tool_output", "")), 1000)
 
     await _ensure_session(db, data)
     await db.execute(
@@ -577,7 +646,8 @@ async def post_tool_use_failure(request: Request):
     data = await request.json()
     sid = data.get("session_id", "unknown")
     db = request.app.state.db
-    tool_output = _truncate(data.get("tool_output", ""), 1000)
+    # PostToolUseFailure carries the error text in `error`.
+    tool_output = _truncate(data.get("error", data.get("tool_response", data.get("tool_output", ""))), 1000)
 
     await _ensure_session(db, data)
     await db.execute(
@@ -634,7 +704,7 @@ async def stop(request: Request):
     db = request.app.state.db
 
     await _ensure_session(db, data)
-    details = estimate_cost_detailed(data.get("transcript_path"))
+    details = estimate_session_cost(data.get("transcript_path"))
     now = _now()
     await db.execute(
         """UPDATE sessions SET status='stopped', last_activity=?, estimated_cost_usd=?,
@@ -658,24 +728,25 @@ async def stop(request: Request):
 
 @app.post("/hooks/subagent-stop")
 async def subagent_stop(request: Request):
+    """Refresh the session total when a subagent finishes.
+
+    The payload's `transcript_path` is the MAIN session transcript; the
+    subagent's own file is `agent_transcript_path`. Rather than adding that
+    file's cost incrementally (which the next Stop would overwrite anyway), we
+    recompute the full session total from the main transcript plus every
+    subagent transcript under it.
+    """
     data = await request.json()
     sid = data.get("session_id", "unknown")
     db = request.app.state.db
 
     await _ensure_session(db, data)
-    details = estimate_cost_detailed(data.get("transcript_path"))
+    details = estimate_session_cost(data.get("transcript_path"))
     now = _now()
     await db.execute(
-        """UPDATE sessions SET last_activity=?,
-           estimated_cost_usd=estimated_cost_usd+?,
-           input_tokens=input_tokens+?,
-           output_tokens=output_tokens+?,
-           cache_write_tokens=cache_write_tokens+?,
-           cache_read_tokens=cache_read_tokens+?,
-           input_cost=input_cost+?,
-           output_cost=output_cost+?,
-           cache_write_cost=cache_write_cost+?,
-           cache_read_cost=cache_read_cost+?
+        """UPDATE sessions SET last_activity=?, estimated_cost_usd=?,
+           input_tokens=?, output_tokens=?, cache_write_tokens=?, cache_read_tokens=?,
+           input_cost=?, output_cost=?, cache_write_cost=?, cache_read_cost=?
            WHERE session_id=?""",
         (now, details["cost"], details["input_tokens"], details["output_tokens"],
          details["cache_write_tokens"], details["cache_read_tokens"],
@@ -698,7 +769,7 @@ async def task_completed(request: Request):
     db = request.app.state.db
 
     await _ensure_session(db, data)
-    details = estimate_cost_detailed(data.get("transcript_path"))
+    details = estimate_session_cost(data.get("transcript_path"))
     now = _now()
     await db.execute(
         """UPDATE sessions SET status='completed', last_activity=?, estimated_cost_usd=?,

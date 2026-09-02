@@ -83,7 +83,7 @@ fi
 # 4. Claude hooks (only the scripts referenced by sandbox settings)
 # ---------------------------------------------------------------------------
 mkdir -p "$HOME/.claude/hooks"
-for hook in format-on-edit.sh post-compact.sh; do
+for hook in format-on-edit.sh compact-reminder.sh; do
     src="$DOTFILES_DIR/claude/hooks/$hook"
     if [[ -f "$src" ]]; then
         cp "$src" "$HOME/.claude/hooks/$hook"

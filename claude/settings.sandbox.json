@@ -117,14 +117,13 @@
         ]
       }
     ],
-    "PostCompact": [
+    "SessionStart": [
       {
-        "matcher": "",
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-compact.sh",
-            "async": false
+            "command": "~/.claude/hooks/compact-reminder.sh"
           }
         ]
       }
@@ -133,5 +132,6 @@
   "enabledPlugins": {
     "code-review@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true
-  }
+  },
+  "plansDirectory": ".claude/plans"
 }

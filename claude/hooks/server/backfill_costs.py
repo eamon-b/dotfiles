@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""One-off backfill: recompute historical session costs under corrected pricing.
+"""Backfill: recompute historical session costs under the current pricing.
 
-Older rows in ``sessions`` were written with stale prices (Opus at $15/$75
-instead of $5/$25, Haiku at Haiku-3.5 rates, Fable/Sonnet-5 falling through to
-the default). This rewrites every session's cost and per-category cost
-breakdown, then rebuilds ``daily_stats.cost`` from the corrected sessions.
+Run this after any change to ``MODEL_PRICING`` or the cost parser. It rewrites
+every session's cost and per-category cost breakdown, then rebuilds
+``daily_stats.cost`` from the corrected sessions. It also repairs sessions
+recorded before the server:
+  * priced subagent transcripts (``<session>/subagents/*.jsonl``) at all,
+  * priced 1-hour-TTL cache writes at the 2x rate instead of 1.25x,
+  * knew Opus 5 / Sonnet 5 / Fable 5.1 pricing.
 
 Two recompute paths per session:
-  * transcript  — re-read ~/.claude/projects/*/<session_id>.jsonl and price
-                  per message (exact, and refreshes token counts too).
+  * transcript  — re-read ~/.claude/projects/*/<session_id>.jsonl plus its
+                  subagent transcripts and price per message (exact; refreshes
+                  token counts too).
   * tokens      — transcript gone: reprice the stored token totals with the
-                  session's model (approximate, but correct for the common
-                  single-model session).
+                  session's model (approximate: single-model, 5m cache TTL).
 
 Sessions with neither a transcript nor stored tokens are left untouched.
 
@@ -59,7 +62,7 @@ def _recompute(row: sqlite3.Row) -> tuple[dict | None, str]:
     """Return (details, source) or (None, 'skipped') if nothing to price."""
     transcript = _find_transcript(row["session_id"])
     if transcript is not None:
-        details = app.estimate_cost_detailed(str(transcript))
+        details = app.estimate_session_cost(str(transcript))
         # A transcript with no usage lines yields cost 0 — don't let that wipe a
         # session that still has stored token counts; fall through to tokens.
         if details["cost"] > 0 or details["input_tokens"] or details["output_tokens"]:

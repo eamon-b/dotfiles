@@ -196,3 +196,6 @@ temp/
 # Coverage reports
 coverage/
 *.lcov
+
+# Claude Code plan files (living docs, per-machine)
+.claude/plans/

@@ -97,7 +97,8 @@
       "Write(.env.*)",
       "Edit(.env)",
       "Edit(.env.*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "hooks": {
     "PreToolUse": [
@@ -197,7 +198,7 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/review-on-stop.sh",
-            "async": true
+            "timeout": 15
           }
         ]
       }
@@ -238,14 +239,13 @@
         ]
       }
     ],
-    "PostCompact": [
+    "SessionStart": [
       {
-        "matcher": "",
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/post-compact.sh",
-            "async": false
+            "command": "~/.claude/hooks/compact-reminder.sh"
           }
         ]
       }
@@ -255,5 +255,43 @@
     "code-review@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true
+  },
+  "model": "claude-fable-5-1[1m]",
+  "agentPushNotifEnabled": true,
+  "plansDirectory": ".claude/plans",
+  "extraKnownMarketplaces": {
+    "cloudflare": {
+      "source": {
+        "source": "github",
+        "repo": "cloudflare/skills"
+      }
+    }
+  },
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: assume private unless the remote host and repo name indicate otherwise, or a visibility check in the transcript shows public",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: main/master of the trusted repo — treat them as protected (no force-push, no hard reset)",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo only — no additional orgs configured",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: any file or store holding personal data, confidential business data, credentials, regulated data, or similarly sensitive material; preserve exact handles when known and share only with audiences cleared at the [named+specifics] bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment (hyphen/underscore/dot-delimited — e.g. matches `prod-db`, not `producer`)",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development",
+      "**Trusted repo**: The git repository at the current working directory and its configured remotes",
+      "**Org-specific CLIs**: None configured"
+    ]
   }
 }

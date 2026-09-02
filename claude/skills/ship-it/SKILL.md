@@ -2,6 +2,7 @@
 name: ship-it
 description: Take a small change from idea to PR in one shot — implement, verify, commit, push, open PR. For small, well-scoped personal-project work; not for large or design-heavy changes.
 argument-hint: "<description of the change>"
+disable-model-invocation: true
 allowed-tools: Bash(git *), Bash(gh *), Read, Edit, Write, Grep, Glob, Bash(npm *), Bash(npx *), Bash(uv *), Bash(uvx *), Bash(pytest *), Bash(cargo *), Bash(python *), Bash(node *), Bash(make *), Bash(ruff *), Bash(prettier *), Bash(eslint *), Bash(tsc *)
 ---
 

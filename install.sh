@@ -11,7 +11,6 @@ BACKUP_DIR="$HOME/.dotfiles_backup"
 # Files to install (source -> destination)
 declare -A FILES=(
     [".bashrc"]="$HOME/.bashrc"
-    ["claude/settings.json"]="$HOME/.claude/settings.json"
     [".editorconfig"]="$HOME/.editorconfig"
     [".gitconfig"]="$HOME/.gitconfig"
     [".gitignore_global"]="$HOME/.gitignore_global"
@@ -26,6 +25,20 @@ declare -A DIRS=(
     ["claude/hooks"]="$HOME/.claude/hooks"
     ["claude/skills"]="$HOME/.claude/skills"
 )
+
+# Claude settings are merged, not copied: the repo owns every key it defines,
+# but plugins/marketplaces registered on this machine (via `claude plugin
+# install`, `/plugin`, or the marketplace UI) are unioned in so an install
+# never un-registers them.
+CLAUDE_SETTINGS_SRC="claude/settings.json"
+CLAUDE_SETTINGS_DEST="$HOME/.claude/settings.json"
+
+# ~/.claude/skills is shared with skills installed from marketplaces and
+# `npx skills`, so the repo only ever touches the skill directories it
+# installed itself. This manifest records which those are, so a skill removed
+# from the repo is removed from ~/.claude/skills on the next install without
+# touching anything else in there.
+SKILLS_MANIFEST="$HOME/.claude/skills/.dotfiles-managed"
 
 # Systemd user service for Claude Code hooks server
 HOOKS_SERVICE_SRC="claude/hooks/server/claude-hooks.service"
@@ -87,6 +100,60 @@ install_dir() {
     echo "Installed $src -> $dest (merged)"
 }
 
+install_claude_settings() {
+    local src="$1"
+    local dest="$2"
+
+    mkdir -p "$(dirname "$dest")"
+
+    if [[ -f "$dest" ]] && command -v jq &>/dev/null && jq -e . "$dest" &>/dev/null; then
+        local merged
+        # The repo file is authoritative (so removed hooks/keys really go
+        # away); only the plugin/marketplace registries are unioned.
+        merged=$(jq -s '
+            .[0] as $existing | .[1] as $repo
+            | $repo
+            | .enabledPlugins = (($existing.enabledPlugins // {}) + ($repo.enabledPlugins // {}))
+            | .extraKnownMarketplaces = (($existing.extraKnownMarketplaces // {}) + ($repo.extraKnownMarketplaces // {}))
+        ' "$dest" "$src")
+        backup_file "$dest"
+        printf '%s\n' "$merged" > "$dest"
+        echo "Installed $src -> $dest (merged; kept locally registered plugins/marketplaces)"
+    else
+        install_file "$src" "$dest"
+    fi
+}
+
+# Remove skill dirs that a previous install put in ~/.claude/skills but that
+# no longer exist in the repo. Only names recorded in the manifest are ever
+# deleted, so marketplace/external skills are never touched.
+# Skills the repo shipped before the manifest existed; pruned on the first
+# run that has no manifest yet, then the manifest takes over.
+LEGACY_REPO_SKILLS=(stats grill worktree)
+
+prune_removed_skills() {
+    local dest="$HOME/.claude/skills"
+    local manifest="$SKILLS_MANIFEST"
+    if [[ ! -f "$manifest" ]]; then
+        manifest=$(mktemp)
+        printf '%s\n' "${LEGACY_REPO_SKILLS[@]}" > "$manifest"
+    fi
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+        if [[ ! -d "$DOTFILES_DIR/claude/skills/$name" && -d "$dest/$name" && ! -d "$dest/$name/.git" ]]; then
+            rm -rf "$dest/$name"
+            echo "Removed skill no longer in repo: $name"
+        fi
+    done < "$manifest"
+    [[ "$manifest" != "$SKILLS_MANIFEST" ]] && rm -f "$manifest"
+    return 0
+}
+
+write_skills_manifest() {
+    mkdir -p "$HOME/.claude/skills"
+    ls -1 "$DOTFILES_DIR/claude/skills" > "$SKILLS_MANIFEST"
+}
+
 echo "Installing dotfiles from $DOTFILES_DIR"
 echo "========================================="
 
@@ -101,6 +168,10 @@ for src in "${!FILES[@]}"; do
     fi
 done
 
+install_claude_settings "$DOTFILES_DIR/$CLAUDE_SETTINGS_SRC" "$CLAUDE_SETTINGS_DEST"
+
+prune_removed_skills
+
 for src in "${!DIRS[@]}"; do
     src_path="$DOTFILES_DIR/$src"
     dest_path="${DIRS[$src]}"
@@ -111,6 +182,8 @@ for src in "${!DIRS[@]}"; do
         echo "Warning: $src_path not found, skipping"
     fi
 done
+
+write_skills_manifest
 
 echo "========================================="
 echo ""
@@ -179,6 +252,9 @@ if [[ -d "$SERVER_DIR" && -f "$SERVER_DIR/requirements.txt" ]]; then
     "$SERVER_DIR/.venv/bin/pip" install -q -r "$SERVER_DIR/requirements.txt"
 fi
 
+# Hook scripts the repo no longer ships (renamed or removed)
+rm -f "$HOME/.claude/hooks/post-compact.sh"
+
 # Make hook scripts executable
 chmod +x "$HOME/.claude/hooks/"*.sh 2>/dev/null || true
 chmod +x "$HOME/.claude/hooks/server/"*.sh 2>/dev/null || true
@@ -188,8 +264,9 @@ if command -v systemctl &>/dev/null; then
     systemctl --user daemon-reload
     systemctl --user enable claude-hooks.service 2>/dev/null && \
         echo "Enabled claude-hooks.service"
-    systemctl --user start claude-hooks.service 2>/dev/null && \
-        echo "Started claude-hooks.service" || \
+    # restart (not start) so a running server picks up the new app.py
+    systemctl --user restart claude-hooks.service 2>/dev/null && \
+        echo "Restarted claude-hooks.service" || \
         echo "Note: Could not start claude-hooks.service (run manually with: systemctl --user start claude-hooks)"
 fi
 

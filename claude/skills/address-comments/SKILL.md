@@ -2,6 +2,7 @@
 name: address-comments
 description: Pull review comments on a PR, address each one with a code change or reply, and push
 argument-hint: "[PR number — defaults to the PR for the current branch]"
+disable-model-invocation: true
 allowed-tools: Bash(git *), Bash(gh *), Read, Edit, Write, Grep, Glob
 ---
 
