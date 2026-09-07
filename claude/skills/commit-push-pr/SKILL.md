@@ -2,7 +2,7 @@
 name: commit-push-pr
 description: Stage, commit, push, and create a pull request in one step
 argument-hint: "[description of changes or PR title]"
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 Automate the full commit-to-PR workflow for the current changes.

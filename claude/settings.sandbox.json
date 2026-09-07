@@ -88,8 +88,6 @@
       "Bash(dd if=* of=/dev/*)",
       "Read(.env)",
       "Read(.env.*)",
-      "Write(.env)",
-      "Write(.env.*)",
       "Edit(.env)",
       "Edit(.env.*)"
     ]
