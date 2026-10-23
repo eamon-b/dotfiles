@@ -3,9 +3,15 @@ name: review-implementation
 description: Review the implementation against its plan in .claude/plans/ to verify correctness, and record the verdict in the plan file
 argument-hint: "[path-to-plan-file]"
 disable-model-invocation: true
+context: fork
+background: false
 ---
 
 Review the implementation against the plan.
+
+You are running in a fresh subagent without the conversation that produced
+this work, so the plan file, the repo, and `git` are your only sources. That
+is deliberate: judge what is written and what was built, not what was meant.
 
 **Resolve the plan path:**
 - If `$ARGUMENTS` is non-empty, use that path.

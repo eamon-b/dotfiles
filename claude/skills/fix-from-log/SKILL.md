@@ -2,6 +2,7 @@
 name: fix-from-log
 description: Fix a bug given log output, error message, or observed behavior
 argument-hint: "<error/log output or description of incorrect behavior>"
+when_to_use: The user pastes a stack trace, error message, failing CI log, or describes something behaving wrongly and wants it fixed.
 ---
 
 Fix the bug described by the following log output, error message, or behavior:

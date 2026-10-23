@@ -29,7 +29,7 @@ For the cloud environment behind `claude.ai/code` / the Claude mobile app, use `
 curl -sf https://raw.githubusercontent.com/eamon-b/dotfiles/main/setup-sandbox.sh | bash
 ```
 
-The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and `.bashrc` (none of which are useful in a cloud container) and uses `claude/settings.sandbox.json` — same permissions, but no `localhost:6271` hooks. It installs the Claude skills, the `format-on-edit` and `compact-reminder` hooks, gitconfig, and editorconfig.
+The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and `.bashrc` (none of which are useful in a cloud container) and generates its `~/.claude/settings.json` from `claude/settings.json` with jq — same permissions, model and plugins, minus the `localhost:6271` HTTP hooks, `notify.sh`, and `defaultMode` (there is no second settings file to keep in sync). It installs the Claude skills, the `format-on-edit`, `security-check`, `review-on-stop` and `compact-reminder` hooks, `format-config.json`, gitconfig, and editorconfig.
 
 **Adding files to the sandbox install:** if a file in `install.sh` should also be present in the cloud sandbox, add it to `setup-sandbox.sh` too. Things to deliberately skip: anything depending on systemd, the local hooks server, desktop notifications, or terminal emulators.
 
@@ -38,7 +38,8 @@ The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and 
 - **Root dotfiles** (`.bashrc`, `.vimrc`, `.gitconfig`, etc.) - Source files copied to `$HOME`
 - **`claude/`** - Claude Code configuration (copied to `~/.claude/`)
   - `settings.json` - Permissions (auto mode), model, HTTP hooks, shell hooks, plugins, `plansDirectory`
-  - `hooks/` - Shell hooks (format-on-edit, notify, review-on-stop, compact-reminder)
+  - `format-config.json` - Formatter defaults for format-on-edit (copied to `~/.claude/`)
+  - `hooks/` - Shell hooks (format-on-edit, security-check, notify, review-on-stop, compact-reminder) and `security-rules.json`
   - `hooks/server/` - HTTP hooks server (FastAPI + SQLite)
   - `skills/` - Custom slash commands
 - **`terminator_config`** - Copied to `~/.config/terminator/config`
@@ -53,8 +54,9 @@ The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and 
 
 ### Shell Hooks
 
-- **format-on-edit.sh** - Auto-formats Python (ruff), JS/TS/JSON (prettier), and Rust (rustfmt) after Edit/Write operations. Reads the path from `tool_input.file_path` in the hook payload and config from `~/.claude/format-config.json`. Logs to `~/.claude/debug/format-hook.log`.
-- **notify.sh** - Desktop notifications on permission prompts and task completion (Kitty OSC 99 with click-to-focus, `notify-send` fallback).
+- **format-on-edit.sh** - Auto-formats Python (ruff), JS/TS/JSON (prettier), and Rust (rustfmt) after Edit/Write operations. Reads the path from `tool_input.file_path` in the hook payload and config from `~/.claude/format-config.json` (shipped from `claude/format-config.json`; if it is missing, built-in defaults apply rather than skipping). A project's own prettier config (`.prettierrc*`, `prettier` in package.json, …) wins over those defaults (`--config-precedence prefer-file`), and prettier runs from the file's git root so the repo's `.prettierignore` applies. Logs to `~/.claude/debug/format-hook.log`.
+- **security-check.py** - PreToolUse command hook (Bash/Read/Write/Edit) that blocks calls matching `hooks/security-rules.json` with exit 2. It exists because HTTP hook connection failures are non-blocking: with only the server enforcing the rules, they silently vanished whenever it was down, and never applied in the sandbox. Fails open on a bad payload or rules file.
+- **notify.sh** - Desktop notifications on permission prompts, auto-mode denials (`PermissionDenied`), and task completion (Kitty OSC 99 with click-to-focus, `notify-send` fallback).
 - **review-on-stop.sh** - When `CLAUDE_REVIEW_ON_STOP=1`, blocks the first Stop of a turn that leaves uncommitted changes and asks Claude to run the bundled `/code-review` on them. Honors `stop_hook_active` so it never blocks twice. Runs synchronously (a blocking decision can't come from an async hook).
 - **compact-reminder.sh** - Re-injects critical context after context window compression. Wired as a `SessionStart` hook with matcher `compact`, because only SessionStart / UserPromptSubmit stdout reaches the model (PostCompact stdout only goes to the debug log). Reads project-specific reminders from `.claude/post-compact-reminders.md` if present.
 
@@ -72,7 +74,7 @@ A local FastAPI server at `http://localhost:6271` that receives all hook events 
 - Per-category cost breakdown (input / output / cache-write / cache-read), shown on the dashboard and in the session drill-down
 - Full tool call audit log
 - Permission request history
-- PreToolUse security rules (`security-rules.json`) that block dangerous commands
+- PreToolUse security rules (`hooks/security-rules.json`, shared with `security-check.py`) that block dangerous commands and log them to the blocked-actions table
 - Web dashboard at `http://localhost:6271/dashboard`
 
 **Management:**
@@ -90,7 +92,7 @@ claude-hooks start|stop|restart|status|logs|dashboard
 The settings use an aggressive allow/deny model:
 - **Allow:** All file tools, git, gh, cargo, npm/npx/node, python/uv/ruff/pytest, vercel, podman, make, and common Unix utilities
 - **Deny:** Destructive operations (rm -rf /, force push, hard reset), sensitive files (.env, credentials, SSH keys)
-- **Second layer:** HTTP PreToolUse hook checks `security-rules.json` regex patterns for more sophisticated blocking
+- **Second layer:** `security-check.py` (and the HTTP server, for logging) checks `hooks/security-rules.json` regex patterns for more sophisticated blocking
 
 ## Skills (Slash Commands)
 
@@ -109,7 +111,7 @@ The settings use an aggressive allow/deny model:
 | `/address-comments` | Pull PR review comments, address each, push (phone-friendly) |
 | `/deploy-preview` | Check Vercel preview deployment status |
 
-Skills with side effects (`commit-push-pr`, `ship-it`, `address-comments`) and the plan skills set `disable-model-invocation: true`, so they only run when typed as a slash command. Adversarial review, usage stats, and worktrees are covered by the bundled `/code-review`, `/security-review`, `/usage` (aliases `/stats`, `/cost`), and `claude --worktree` / `/batch`, so there are no custom skills for them.
+`ship-it`, `address-comments` and the plan skills set `disable-model-invocation: true`, so they only run when typed as a slash command; `commit-push-pr` is deliberately model-invocable and pre-approves only the git/gh commands it runs via `allowed-tools`. `sitrep`, `address-comments` and `commit-push-pr` gather their git/gh data with `` !`cmd` `` injection before Claude sees the skill (each command ends in `|| true`, because a failing injected command aborts the whole skill). `review-plan` and `review-implementation` use `context: fork` + `background: false`, so the reviewer starts without the conversation that wrote the plan or code. Adversarial review, usage stats, and worktrees are covered by the bundled `/code-review`, `/security-review`, `/usage` (aliases `/stats`, `/cost`), and `claude --worktree` / `/batch`, so there are no custom skills for them.
 
 ### Plan workflow
 

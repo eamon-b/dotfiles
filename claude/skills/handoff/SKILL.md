@@ -2,6 +2,7 @@
 name: handoff
 description: Summarize current task and write a handoff document for the next agent
 argument-hint: "[optional filename or notes]"
+when_to_use: The user is ending a session, running low on context, or asks to save progress so another session can pick the work up.
 ---
 
 Create a comprehensive handoff document for continuing this task in a new session.

@@ -3,19 +3,31 @@ name: commit-push-pr
 description: Stage, commit, push, and create a pull request in one step
 argument-hint: "[description of changes or PR title]"
 disable-model-invocation: false
+allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git add *) Bash(git commit *) Bash(git checkout -b *) Bash(git push *) Bash(gh pr create *) Bash(gh pr view *)
 ---
 
 Automate the full commit-to-PR workflow for the current changes.
 
 $ARGUMENTS
 
+## Current state
+
+Gathered before this skill loaded:
+
+!`git status -sb 2>&1 || true`
+
+!`git diff HEAD --stat 2>&1 || true`
+
+Recent commit style:
+!`git log --oneline -10 2>&1 || true`
+
 ## Steps
 
-1. **Assess changes**: Run `git status` and `git diff --staged` and `git diff` to understand what has changed.
+1. **Assess changes**: Start from the state above, then read the full `git diff --staged` / `git diff` for the files that matter.
 
 2. **Stage changes**: Add relevant files. Prefer `git add` with specific files over `git add -A`. Never stage `.env`, credentials, or large binary files.
 
-3. **Commit**: Write a concise commit message that explains the *why* not just the *what*. Follow the repository's existing commit message style (check `git log --oneline -10`).
+3. **Commit**: Write a concise commit message that explains the *why* not just the *what*. Follow the repository's existing commit message style (recent commits above).
 
 4. **Push**: Push to the remote. If on `main`/`master`, create a feature branch first:
    ```bash

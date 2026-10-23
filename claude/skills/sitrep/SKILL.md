@@ -2,18 +2,31 @@
 name: sitrep
 description: Fast, mobile-readable status report for the current repo — branch, uncommitted work, your open PRs with CI/review state, and PRs awaiting your review
 argument-hint: ""
+model: haiku
 allowed-tools: Bash(git *), Bash(gh *)
 ---
 
 Give a tight situation report so the user can decide what to work on next from their phone.
 
+## Data
+
+Gathered before this skill loaded (an `ERROR`/empty block means that command failed — e.g. `gh` not authenticated):
+
+Branch and working tree:
+!`git status -sb 2>&1 || true`
+
+Recent commits:
+!`git log --oneline -5 2>&1 || true`
+
+Your open PRs:
+!`gh pr list --author=@me --state=open --json number,title,headRefName,statusCheckRollup,reviewDecision,url --limit 20 2>&1 || true`
+
+PRs awaiting your review:
+!`gh pr list --search "review-requested:@me state:open" --json number,title,url,author --limit 10 2>&1 || true`
+
 ## Steps
 
-1. **Gather data in parallel** (single message, multiple Bash calls):
-   - `git status -sb` — branch + dirty state
-   - `git log --oneline -5` — recent commits on this branch
-   - `gh pr list --author=@me --state=open --json number,title,headRefName,statusCheckRollup,reviewDecision,url --limit 20` — your open PRs
-   - `gh pr list --search "review-requested:@me state:open" --json number,title,url,author --limit 10` — PRs waiting on you
+1. **Use the data above** — don't re-run those commands unless a block is missing.
 
 2. **For each of your open PRs**, derive a one-line status from `statusCheckRollup` (rolled-up CI: pass / fail / pending) and `reviewDecision` (APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED / null).
 

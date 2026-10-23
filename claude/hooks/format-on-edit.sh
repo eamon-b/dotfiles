@@ -4,8 +4,9 @@
 
 set -euo pipefail
 
-# Ensure common tool paths are available
-export PATH="$HOME/.local/bin:$HOME/.nvm/versions/node/v24.13.0/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+# Ensure common tool paths are available (newest nvm node, if nvm is installed)
+NVM_NODE_BIN=$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1 || true)
+export PATH="$HOME/.local/bin${NVM_NODE_BIN:+:$NVM_NODE_BIN}:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 CONFIG_FILE="$HOME/.claude/format-config.json"
 LOG_FILE="$HOME/.claude/debug/format-hook.log"
@@ -43,14 +44,17 @@ fi
 
 log "Processing: $FILE_PATH"
 
-# Check if config exists
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    log "Config file not found: $CONFIG_FILE"
-    exit 0
+# Read the config once. Every lookup below has a default, so a missing or
+# unreadable config formats with those defaults rather than skipping.
+CONFIG='{}'
+if [[ -f "$CONFIG_FILE" ]] && jq -e . "$CONFIG_FILE" &>/dev/null; then
+    CONFIG=$(cat "$CONFIG_FILE")
+else
+    log "Config file missing or invalid, using defaults: $CONFIG_FILE"
 fi
 
 # Check if formatting is enabled globally
-ENABLED=$(jq -r '.enabled // true' "$CONFIG_FILE")
+ENABLED=$(jq -r '.enabled // true' <<<"$CONFIG")
 if [[ "$ENABLED" != "true" ]]; then
     log "Formatting disabled globally"
     exit 0
@@ -60,30 +64,40 @@ fi
 EXT=".${FILE_PATH##*.}"
 EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
 
+# The repo (or directory) a file lives in. Prettier resolves .prettierignore
+# from its working directory, so it runs from here for a repo's ignore file to
+# apply.
+project_root() {
+    git -C "$(dirname "$1")" rev-parse --show-toplevel 2>/dev/null || dirname "$1"
+}
+
 # Determine which formatter to use based on extension
 format_javascript() {
     local file="$1"
     local config_section="javascript"
 
-    local section_enabled=$(jq -r ".$config_section.enabled // true" "$CONFIG_FILE")
+    local section_enabled=$(jq -r ".$config_section.enabled // true" <<<"$CONFIG")
     if [[ "$section_enabled" != "true" ]]; then
         log "JavaScript formatting disabled"
         return 0
     fi
 
     # Build prettier options from config
-    local tab_width=$(jq -r ".$config_section.options.tabWidth // 2" "$CONFIG_FILE")
-    local use_tabs=$(jq -r ".$config_section.options.useTabs // false" "$CONFIG_FILE")
-    local semi=$(jq -r ".$config_section.options.semi // true" "$CONFIG_FILE")
-    local single_quote=$(jq -r ".$config_section.options.singleQuote // false" "$CONFIG_FILE")
-    local trailing_comma=$(jq -r ".$config_section.options.trailingComma // \"es5\"" "$CONFIG_FILE")
-    local print_width=$(jq -r ".$config_section.options.printWidth // 80" "$CONFIG_FILE")
+    local tab_width=$(jq -r ".$config_section.options.tabWidth // 2" <<<"$CONFIG")
+    local use_tabs=$(jq -r ".$config_section.options.useTabs // false" <<<"$CONFIG")
+    local semi=$(jq -r ".$config_section.options.semi // true" <<<"$CONFIG")
+    local single_quote=$(jq -r ".$config_section.options.singleQuote // false" <<<"$CONFIG")
+    local trailing_comma=$(jq -r ".$config_section.options.trailingComma // \"es5\"" <<<"$CONFIG")
+    local print_width=$(jq -r ".$config_section.options.printWidth // 80" <<<"$CONFIG")
 
     local prettier_args=(
         "--write"
         "--tab-width" "$tab_width"
         "--print-width" "$print_width"
         "--trailing-comma" "$trailing_comma"
+        # A project's own prettier config beats these defaults; without one
+        # they apply as before.
+        "--config-precedence" "prefer-file"
     )
 
     [[ "$use_tabs" == "true" ]] && prettier_args+=("--use-tabs")
@@ -93,10 +107,10 @@ format_javascript() {
     # Try to find prettier
     if command -v prettier &>/dev/null; then
         log "Running: prettier ${prettier_args[*]} $file"
-        prettier "${prettier_args[@]}" "$file" 2>&1 | while read -r line; do log "prettier: $line"; done
+        (cd "$(project_root "$file")" && prettier "${prettier_args[@]}" "$file") 2>&1 | while read -r line; do log "prettier: $line"; done
     elif command -v npx &>/dev/null; then
         log "Running: npx prettier ${prettier_args[*]} $file"
-        npx --yes prettier "${prettier_args[@]}" "$file" 2>&1 | while read -r line; do log "npx prettier: $line"; done
+        (cd "$(project_root "$file")" && npx --yes prettier "${prettier_args[@]}" "$file") 2>&1 | while read -r line; do log "npx prettier: $line"; done
     else
         log "ERROR: prettier not found and npx not available"
         return 1
@@ -107,14 +121,14 @@ format_python() {
     local file="$1"
     local config_section="python"
 
-    local section_enabled=$(jq -r ".$config_section.enabled // true" "$CONFIG_FILE")
+    local section_enabled=$(jq -r ".$config_section.enabled // true" <<<"$CONFIG")
     if [[ "$section_enabled" != "true" ]]; then
         log "Python formatting disabled"
         return 0
     fi
 
-    local line_length=$(jq -r ".$config_section.options.lineLength // 100" "$CONFIG_FILE")
-    local indent_width=$(jq -r ".$config_section.options.indentWidth // 4" "$CONFIG_FILE")
+    local line_length=$(jq -r ".$config_section.options.lineLength // 100" <<<"$CONFIG")
+    local indent_width=$(jq -r ".$config_section.options.indentWidth // 4" <<<"$CONFIG")
 
     local ruff_args=(
         "format"
@@ -141,13 +155,13 @@ format_rust() {
     local file="$1"
     local config_section="rust"
 
-    local section_enabled=$(jq -r ".$config_section.enabled // true" "$CONFIG_FILE")
+    local section_enabled=$(jq -r ".$config_section.enabled // true" <<<"$CONFIG")
     if [[ "$section_enabled" != "true" ]]; then
         log "Rust formatting disabled"
         return 0
     fi
 
-    local edition=$(jq -r ".$config_section.options.edition // \"2021\"" "$CONFIG_FILE")
+    local edition=$(jq -r ".$config_section.options.edition // \"2021\"" <<<"$CONFIG")
 
     local rustfmt_args=("--edition" "$edition")
 
@@ -167,26 +181,27 @@ format_json() {
     local file="$1"
     local config_section="json"
 
-    local section_enabled=$(jq -r ".$config_section.enabled // true" "$CONFIG_FILE")
+    local section_enabled=$(jq -r ".$config_section.enabled // true" <<<"$CONFIG")
     if [[ "$section_enabled" != "true" ]]; then
         log "JSON formatting disabled"
         return 0
     fi
 
-    local tab_width=$(jq -r ".$config_section.options.tabWidth // 2" "$CONFIG_FILE")
+    local tab_width=$(jq -r ".$config_section.options.tabWidth // 2" <<<"$CONFIG")
 
     local prettier_args=(
         "--write"
         "--tab-width" "$tab_width"
         "--parser" "json"
+        "--config-precedence" "prefer-file"
     )
 
     if command -v prettier &>/dev/null; then
         log "Running: prettier ${prettier_args[*]} $file"
-        prettier "${prettier_args[@]}" "$file" 2>&1 | while read -r line; do log "prettier: $line"; done
+        (cd "$(project_root "$file")" && prettier "${prettier_args[@]}" "$file") 2>&1 | while read -r line; do log "prettier: $line"; done
     elif command -v npx &>/dev/null; then
         log "Running: npx prettier ${prettier_args[*]} $file"
-        npx --yes prettier "${prettier_args[@]}" "$file" 2>&1 | while read -r line; do log "npx prettier: $line"; done
+        (cd "$(project_root "$file")" && npx --yes prettier "${prettier_args[@]}" "$file") 2>&1 | while read -r line; do log "npx prettier: $line"; done
     else
         log "ERROR: prettier not found for JSON formatting"
         return 1
@@ -194,10 +209,10 @@ format_json() {
 }
 
 # Check extensions and call appropriate formatter
-JS_EXTENSIONS=$(jq -r '.javascript.extensions // [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"] | .[]' "$CONFIG_FILE")
-PY_EXTENSIONS=$(jq -r '.python.extensions // [".py", ".pyi"] | .[]' "$CONFIG_FILE")
-JSON_EXTENSIONS=$(jq -r '.json.extensions // [".json", ".jsonc"] | .[]' "$CONFIG_FILE")
-RUST_EXTENSIONS=$(jq -r '.rust.extensions // [".rs"] | .[]' "$CONFIG_FILE")
+JS_EXTENSIONS=$(jq -r '.javascript.extensions // [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"] | .[]' <<<"$CONFIG")
+PY_EXTENSIONS=$(jq -r '.python.extensions // [".py", ".pyi"] | .[]' <<<"$CONFIG")
+JSON_EXTENSIONS=$(jq -r '.json.extensions // [".json", ".jsonc"] | .[]' <<<"$CONFIG")
+RUST_EXTENSIONS=$(jq -r '.rust.extensions // [".rs"] | .[]' <<<"$CONFIG")
 
 if echo "$JS_EXTENSIONS" | grep -qx -- "$EXT_LOWER"; then
     format_javascript "$FILE_PATH"

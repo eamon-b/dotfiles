@@ -2,6 +2,7 @@
 name: test-and-fix
 description: Run tests, analyze failures, fix them, and re-run until green
 argument-hint: "[test command or file pattern]"
+when_to_use: The user asks to run the tests, make tests pass, get CI green, or fix failing tests.
 ---
 
 Run the project's test suite, analyze any failures, fix them, and iterate until all tests pass.

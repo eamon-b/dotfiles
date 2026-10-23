@@ -10,21 +10,26 @@ Address review comments on a pull request end-to-end. Designed for handling revi
 
 $ARGUMENTS
 
+## PR for the current branch
+
+Gathered before this skill loaded (empty or an error if the branch has no PR; ignore it if a different PR number was given above):
+
+!`gh pr view --json number,title,url,headRefName,author,reviews,comments 2>&1 || true`
+
 ## Steps
 
 1. **Identify the PR**:
    - If a number is given in arguments, use it.
-   - Otherwise: `gh pr view --json number,title,headRefName,url` to find the PR for the current branch.
+   - Otherwise use the PR shown above.
    - If no PR is found, stop and tell the user.
 
 2. **Sync local with remote**:
    - `gh pr checkout <number>` (idempotent — also works if already on the branch)
    - `git pull --ff-only`
 
-3. **Fetch comments** (parallel):
-   - Inline review comments: `gh api repos/{owner}/{repo}/pulls/<number>/comments`
-   - General PR comments: `gh api repos/{owner}/{repo}/issues/<number>/comments`
-   - Review summaries: `gh pr view <number> --json reviews`
+3. **Fetch comments**:
+   - Inline review comments: `gh api repos/{owner}/{repo}/pulls/<number>/comments` (not included above)
+   - General comments and review summaries are in the block above for the current branch's PR; for a different PR, fetch them with `gh pr view <number> --json reviews,comments`
 
    Filter to comments authored by users other than the PR author, and to those without a later resolution/reply from the PR author.
 

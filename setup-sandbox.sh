@@ -68,14 +68,26 @@ for skill in "${!EXTERNAL_SKILLS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 3. Claude settings (sandbox variant — no localhost hooks server)
+# 3. Claude settings (derived from settings.json — no localhost hooks server)
 # ---------------------------------------------------------------------------
+# Generated rather than kept as a second file so the two can't drift. Drops
+# the HTTP hooks (no server here), desktop notifications, and defaultMode (the
+# cloud session picks its own permission mode); everything else carries over.
 mkdir -p "$HOME/.claude"
-if [[ -f "$DOTFILES_DIR/claude/settings.sandbox.json" ]]; then
-    cp "$DOTFILES_DIR/claude/settings.sandbox.json" "$HOME/.claude/settings.json"
+if command -v jq &>/dev/null; then
+    jq '
+        del(.permissions.defaultMode)
+        | .hooks |= (
+            map_values(
+                map(.hooks |= map(select(.type != "http" and ((.command // "") | contains("notify.sh") | not))))
+                | map(select(.hooks | length > 0))
+            )
+            | with_entries(select(.value | length > 0))
+        )
+    ' "$DOTFILES_DIR/claude/settings.json" > "$HOME/.claude/settings.json"
     log "Installed sandbox Claude settings -> ~/.claude/settings.json"
 else
-    log "Warning: settings.sandbox.json missing, falling back to local settings.json"
+    log "Warning: jq missing, installing settings.json unfiltered (localhost hooks will fail harmlessly)"
     cp "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
 fi
 
@@ -83,11 +95,11 @@ fi
 # 4. Claude hooks (only the scripts referenced by sandbox settings)
 # ---------------------------------------------------------------------------
 mkdir -p "$HOME/.claude/hooks"
-for hook in format-on-edit.sh compact-reminder.sh; do
+for hook in format-on-edit.sh compact-reminder.sh review-on-stop.sh security-check.py security-rules.json; do
     src="$DOTFILES_DIR/claude/hooks/$hook"
     if [[ -f "$src" ]]; then
         cp "$src" "$HOME/.claude/hooks/$hook"
-        chmod +x "$HOME/.claude/hooks/$hook"
+        [[ "$hook" != *.json ]] && chmod +x "$HOME/.claude/hooks/$hook"
     fi
 done
 # format-on-edit reads its config from ~/.claude/format-config.json if present;

@@ -18,6 +18,7 @@ declare -A FILES=(
     [".vimrc"]="$HOME/.vimrc"
     ["terminator_config"]="$HOME/.config/terminator/config"
     ["kitty.conf"]="$HOME/.config/kitty/kitty.conf"
+    ["claude/format-config.json"]="$HOME/.claude/format-config.json"
 )
 
 # Directories to install (source -> destination)
@@ -254,6 +255,7 @@ fi
 
 # Hook scripts the repo no longer ships (renamed or removed)
 rm -f "$HOME/.claude/hooks/post-compact.sh"
+rm -f "$HOME/.claude/hooks/server/security-rules.json"  # moved up to hooks/
 
 # Make hook scripts executable
 chmod +x "$HOME/.claude/hooks/"*.sh 2>/dev/null || true

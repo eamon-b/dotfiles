@@ -109,6 +109,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash|Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/security-check.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -123,17 +133,7 @@
         ]
       },
       {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/format-on-edit.sh",
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -247,12 +247,27 @@
           }
         ]
       }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh denied 'Auto mode denied a tool call'",
+            "async": true
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
     "code-review@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true
+    "pyright-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "model": "claude-fable-5-1[1m]",
   "agentPushNotifEnabled": true,

@@ -1,0 +1,36 @@
+{
+  "enabled": true,
+  "javascript": {
+    "enabled": true,
+    "formatter": "prettier",
+    "extensions": [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"],
+    "options": {
+      "tabWidth": 2,
+      "useTabs": false,
+      "semi": true,
+      "singleQuote": false,
+      "trailingComma": "es5",
+      "printWidth": 80,
+      "bracketSpacing": true,
+      "arrowParens": "always"
+    }
+  },
+  "python": {
+    "enabled": true,
+    "formatter": "ruff",
+    "extensions": [".py", ".pyi"],
+    "options": {
+      "lineLength": 100,
+      "indentWidth": 4
+    }
+  },
+  "json": {
+    "enabled": true,
+    "formatter": "prettier",
+    "extensions": [".json", ".jsonc"],
+    "options": {
+      "tabWidth": 2,
+      "useTabs": false
+    }
+  }
+}

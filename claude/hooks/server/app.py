@@ -32,7 +32,7 @@ DB_PATH = Path(
 SECURITY_RULES_PATH = Path(
     os.environ.get(
         "CLAUDE_HOOKS_SECURITY_RULES",
-        Path(__file__).parent / "security-rules.json",
+        Path(__file__).parent.parent / "security-rules.json",
     )
 )
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"

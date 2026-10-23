@@ -1,7 +1,7 @@
 #!/bin/bash
 # Claude Code notification hook
 # Usage: notify.sh <type> [message]
-# Types: permission, complete
+# Types: permission, denied, complete
 #
 # Uses kitty's OSC 99 for notifications with native click-to-focus.
 # Falls back to notify-send when not running inside kitty.
@@ -71,6 +71,10 @@ send_notification() {
 case "$TYPE" in
     permission)
         send_notification "critical" "Permission Required" "$BODY" \
+            "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+        ;;
+    denied)
+        send_notification "normal" "Action Denied" "$BODY" \
             "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
         ;;
     complete)
