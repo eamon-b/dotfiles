@@ -21,7 +21,7 @@
       "description": "Fork bomb"
     },
     {
-      "pattern": "git\\s+push\\s+.*--force",
+      "pattern": "git\\s+push\\s+.*--force(?![-\\w])",
       "description": "Git force push"
     },
     {
