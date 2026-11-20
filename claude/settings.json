@@ -268,9 +268,10 @@
     "pyright-lsp@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "vercel@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "cloudflare@cloudflare": true
   },
-  "model": "claude-fable-5-1[1m]",
+  "model": "opus",
   "agentPushNotifEnabled": true,
   "plansDirectory": ".claude/plans",
   "extraKnownMarketplaces": {
@@ -307,5 +308,6 @@
       "**Trusted repo**: The git repository at the current working directory and its configured remotes",
       "**Org-specific CLIs**: None configured"
     ]
-  }
+  },
+  "inputNeededNotifEnabled": true
 }

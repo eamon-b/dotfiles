@@ -18,6 +18,8 @@ declare -A FILES=(
     [".vimrc"]="$HOME/.vimrc"
     ["terminator_config"]="$HOME/.config/terminator/config"
     ["kitty.conf"]="$HOME/.config/kitty/kitty.conf"
+    ["dunst/dunstrc"]="$HOME/.config/dunst/dunstrc"
+    ["vscode/settings.json"]="$HOME/.config/Code/User/settings.json"
     ["claude/format-config.json"]="$HOME/.claude/format-config.json"
 )
 

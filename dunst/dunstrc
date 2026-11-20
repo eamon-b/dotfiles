@@ -1,0 +1,94 @@
+[global]
+    # Display
+    monitor = 0
+    follow = keyboard
+
+    # Geometry
+    width = 350
+    height = 150
+    origin = top-right
+    offset = 20x50
+    notification_limit = 5
+
+    # Progress bar
+    progress_bar = true
+    progress_bar_height = 10
+    progress_bar_frame_width = 1
+
+    # Appearance
+    transparency = 10
+    separator_height = 2
+    padding = 12
+    horizontal_padding = 12
+    frame_width = 2
+    frame_color = "#89b4fa"
+    separator_color = frame
+    corner_radius = 10
+
+    # Text
+    font = Monospace 11
+    line_height = 0
+    markup = full
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    vertical_alignment = center
+    show_age_threshold = 60
+    ellipsize = middle
+    ignore_newline = no
+    stack_duplicates = true
+    hide_duplicate_count = false
+    show_indicators = yes
+
+    # Icons
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 64
+
+    # History
+    sticky_history = yes
+    history_length = 20
+
+    # Misc
+    sort = yes
+    idle_threshold = 120
+    mouse_left_click = do_action, close_current
+    mouse_middle_click = close_all
+    mouse_right_click = close_current
+
+[urgency_low]
+    background = "#1e1e2e"
+    foreground = "#cdd6f4"
+    frame_color = "#89b4fa"
+    timeout = 5
+
+[urgency_normal]
+    background = "#1e1e2e"
+    foreground = "#cdd6f4"
+    frame_color = "#89b4fa"
+    timeout = 10
+
+[urgency_critical]
+    background = "#1e1e2e"
+    foreground = "#cdd6f4"
+    frame_color = "#f38ba8"
+    timeout = 0
+
+# Claude Code specific rules
+[claude_permission]
+    appname = "Claude Code"
+    summary = "Permission Required"
+    urgency = critical
+    background = "#1e1e2e"
+    foreground = "#f9e2af"
+    frame_color = "#f38ba8"
+    timeout = 0
+    default_icon = dialog-warning
+
+[claude_complete]
+    appname = "Claude Code"
+    summary = "Task Complete"
+    background = "#1e1e2e"
+    foreground = "#a6e3a1"
+    frame_color = "#a6e3a1"
+    timeout = 10
+    default_icon = dialog-information

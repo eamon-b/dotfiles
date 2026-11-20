@@ -8,6 +8,24 @@ This is a personal dotfiles repository for Fedora/Linux development environments
 
 ## Installation
 
+### New Fedora machine (Cinnamon spin)
+
+```bash
+sudo dnf install -y git gh && gh auth login
+gh repo clone eamon-b/dotfiles ~/projects/dotfiles
+~/projects/dotfiles/fedora/bootstrap.sh
+```
+
+`fedora/bootstrap.sh` does the whole machine: `dnf upgrade`, RPM Fusion + codecs + HW video decode driver, VS Code / Chrome / Tailscale / Claude Desktop repos, the `DNF_PACKAGES` and `FLATPAKS` lists, fwupd firmware, rustup, nvm + Node LTS (+ `NPM_GLOBALS`), uv (+ `UV_TOOLS`), eza (prebuilt; not packaged in Fedora 43), Claude Code (native installer), then `install.sh`, VS Code extensions (`vscode/extensions.txt`), Claude plugins (from `enabledPlugins`), Cinnamon settings (`cinnamon/cinnamon.dconf`, loaded once, not by `install.sh`), kitty/variety autostart, and the dunst / syncthing / `rclone-gdrive` user services. Idempotent; it prints the remaining manual steps (secrets and logins: `~/.gitconfig.local`, `tailscale up`, `claude` login, `rclone.conf`, Syncthing pairing).
+
+Secrets never go in this repo (it is public): `rclone.conf`, `~/.gitconfig.local`, SSH keys.
+
+`gdrive/rclone-gdrive.service` mounts the whole Drive on demand at `~/GoogleDrive` (VFS cache capped at 5G). The big machine instead uses an hourly `rclone bisync` timer of selected folders to `/mnt/data/GoogleDrive`, which is not in this repo.
+
+`.bashrc` is shared across machines: anything tied to the data disk is guarded by `[[ -d /mnt/data ]]`; put other machine-specific bits in `~/.bashrc.local`.
+
+To refresh after changing things on a machine: `code --list-extensions > vscode/extensions.txt`, and re-export Cinnamon settings with `dconf dump /org/cinnamon/` (drop `desktop/background`, `desktop/a11y/applications`, `command-history`, `cursor-theme`).
+
 ### Local machine
 
 ```bash
@@ -43,6 +61,11 @@ The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and 
   - `hooks/server/` - HTTP hooks server (FastAPI + SQLite)
   - `skills/` - Custom slash commands
 - **`terminator_config`** - Copied to `~/.config/terminator/config`
+- **`fedora/bootstrap.sh`** - Fresh-install setup (packages, repos, toolchains, services); runs `install.sh`
+- **`vscode/`** - `settings.json` (copied by `install.sh`) and `extensions.txt` (installed by bootstrap)
+- **`dunst/dunstrc`** - Copied to `~/.config/dunst/dunstrc`
+- **`cinnamon/cinnamon.dconf`** - `dconf load /org/cinnamon/` snapshot (bootstrap only)
+- **`gdrive/rclone-gdrive.service`** - On-demand Google Drive mount (user unit, bootstrap only)
 
 ## Adding New Dotfiles
 

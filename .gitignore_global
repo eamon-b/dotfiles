@@ -199,3 +199,5 @@ coverage/
 
 # Claude Code plan files (living docs, per-machine)
 .claude/plans/
+
+**/.claude/settings.local.json

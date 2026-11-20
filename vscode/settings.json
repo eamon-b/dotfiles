@@ -1,0 +1,7 @@
+{
+    "workbench.colorTheme": "Atom One Dark",
+    "editor.minimap.enabled": false,
+    "explorer.confirmDragAndDrop": false,
+    "explorer.confirmDelete": false,
+    "security.workspace.trust.untrustedFiles": "open"
+}

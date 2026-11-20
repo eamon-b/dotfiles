@@ -1,0 +1,29 @@
+[Unit]
+Description=rclone mount: Google Drive on demand at ~/GoogleDrive
+Documentation=https://rclone.org/commands/rclone_mount/
+
+# Files are fetched when opened and kept in a local VFS cache (capped below),
+# so the whole Drive is browsable without a full local copy. Needs the
+# `gdrive` remote in ~/.config/rclone/rclone.conf.
+#
+# User units can't wait on network-online.target, so a start before the
+# network is up just fails and Restart= retries it.
+
+[Service]
+Type=notify
+ExecStartPre=/usr/bin/mkdir -p %h/GoogleDrive %h/.local/log
+ExecStart=/usr/bin/rclone mount gdrive: %h/GoogleDrive \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 5G \
+    --vfs-cache-max-age 720h \
+    --dir-cache-time 1h \
+    --poll-interval 1m \
+    --drive-skip-shortcuts \
+    --log-level NOTICE \
+    --log-file %h/.local/log/rclone-gdrive.log
+ExecStop=/usr/bin/fusermount3 -uz %h/GoogleDrive
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

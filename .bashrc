@@ -194,9 +194,12 @@ alias prestart='podman-compose restart'
 
 export PYTHONDONTWRITEBYTECODE=1  # No .pyc files
 export PYTHONUNBUFFERED=1         # Unbuffered output
-export UV_CACHE_DIR="/mnt/data/.cache/uv"
-export UV_PYTHON_INSTALL_DIR="/mnt/data/.local/share/uv/python"
-export PIP_CACHE_DIR="/mnt/data/.cache/pip"
+# Keep big caches on the data disk on machines that have one
+if [[ -d /mnt/data ]]; then
+    export UV_CACHE_DIR="/mnt/data/.cache/uv"
+    export UV_PYTHON_INSTALL_DIR="/mnt/data/.local/share/uv/python"
+    export PIP_CACHE_DIR="/mnt/data/.cache/pip"
+fi
 
 alias py='python3'
 alias pip='uv pip'
@@ -426,14 +429,17 @@ if [[ -f ~/.bashrc.local ]]; then
     . ~/.bashrc.local
 fi
 
-. "$HOME/.local/share/../bin/env"
+# uv's env file (only exists once uv is installed)
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
-# Android emulator environment varibales
-export ANDROID_AVD_HOME="/mnt/data/Android/avd"
-export ANDROID_HOME=/mnt/data/Android/Sdk
-export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-export PATH=$PATH:$ANDROID_HOME/platform-tools
-export PATH=$PATH:$ANDROID_HOME/emulator
+# Android SDK (only on machines that have it)
+if [[ -d /mnt/data/Android/Sdk ]]; then
+    export ANDROID_AVD_HOME="/mnt/data/Android/avd"
+    export ANDROID_HOME=/mnt/data/Android/Sdk
+    export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+    export PATH=$PATH:$ANDROID_HOME/platform-tools
+    export PATH=$PATH:$ANDROID_HOME/emulator
+fi
 
 # ==============================================================================
 # Claude Code Integration
@@ -469,3 +475,5 @@ claude-hooks() {
 # Enable command-in-title feature (must be at end of bashrc to avoid
 # firing during initialization, which causes stray characters in prompt)
 trap 'show_command_in_title' DEBUG
+
+export CLAUDE_CODE_TMPDIR="/var/tmp/claude-$USER"
