@@ -439,6 +439,12 @@ if [[ -d /mnt/data/Android/Sdk ]]; then
     export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
     export PATH=$PATH:$ANDROID_HOME/platform-tools
     export PATH=$PATH:$ANDROID_HOME/emulator
+elif [[ -d ~/Android/Sdk ]]; then
+    export ANDROID_AVD_HOME="~/Android/avd"
+    export ANDROID_HOME=~/Android/Sdk
+    export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+    export PATH=$PATH:$ANDROID_HOME/platform-tools
+    export PATH=$PATH:$ANDROID_HOME/emulator
 fi
 
 # ==============================================================================
