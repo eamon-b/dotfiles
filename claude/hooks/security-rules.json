@@ -79,8 +79,8 @@
   ],
   "deny_file_patterns": [
     {
-      "pattern": "(\\/|^)\\.env(\\..*)?$",
-      "description": "Environment files (.env, .env.local, etc.)"
+      "pattern": "(\\/|^)\\.env(?!\\.example$)(\\..*)?$",
+      "description": "Environment files (.env, .env.local, etc.; .env.example is allowed)"
     },
     {
       "pattern": "(\\/|^)credentials\\.json$",
