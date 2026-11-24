@@ -22,7 +22,7 @@ COMMAND_LOG="$HOME/.command_history.log"
 # Log every command with timestamp and working directory
 log_command() {
     local cmd
-    cmd=$(history 1 | sed 's/^ *[0-9]* *//')
+    cmd=$(HISTTIMEFORMAT= history 1 | sed 's/^ *[0-9]* *//')
     if [[ -n "$cmd" ]]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(pwd)] $cmd" >> "$COMMAND_LOG"
     fi
@@ -440,11 +440,18 @@ if [[ -d /mnt/data/Android/Sdk ]]; then
     export PATH=$PATH:$ANDROID_HOME/platform-tools
     export PATH=$PATH:$ANDROID_HOME/emulator
 elif [[ -d ~/Android/Sdk ]]; then
-    export ANDROID_AVD_HOME="~/Android/avd"
+    export ANDROID_AVD_HOME="$HOME/.android/avd"
     export ANDROID_HOME=~/Android/Sdk
     export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
     export PATH=$PATH:$ANDROID_HOME/platform-tools
     export PATH=$PATH:$ANDROID_HOME/emulator
+fi
+
+# JDK 21 for Android/Gradle builds: the default `java` can be a newer, headless
+# JRE with no javac, which Gradle can't compile with
+if [[ -d /usr/lib/jvm/java-21-openjdk ]]; then
+    export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+    export PATH=$JAVA_HOME/bin:$PATH
 fi
 
 # ==============================================================================
