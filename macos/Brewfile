@@ -1,0 +1,50 @@
+# macos/Brewfile — installed by macos/bootstrap.sh via `brew bundle`.
+# Mirrors DNF_PACKAGES in fedora/bootstrap.sh, minus the personal-machine
+# stuff (Signal, calibre, syncthing, rclone/Drive, tailscale, variety).
+#
+# Re-run any time:   brew bundle --file=~/projects/dotfiles/macos/Brewfile
+# See what's extra:  brew bundle cleanup --file=...   (lists, doesn't remove)
+
+# --- shell: macOS ships bash 3.2 (2007); .bashrc needs 4+ (globstar, dirspell)
+brew "bash"
+brew "bash-completion@2"
+
+# --- core CLI (same set as Fedora)
+brew "git"
+brew "git-lfs"
+brew "gh"
+brew "jq"
+brew "wget"
+brew "p7zip"
+brew "zstd"
+brew "vim"            # system vim lacks +clipboard
+brew "neovim"
+brew "tmux"
+brew "htop"
+brew "fzf"
+brew "ripgrep"
+brew "bat"
+brew "fd"             # Fedora calls it fd-find; same `fd` binary
+brew "zoxide"
+brew "eza"
+brew "tree"
+brew "python"         # for the hooks-server venv; use uv for projects
+brew "terminal-notifier"   # Claude notifications that focus the terminal on click
+
+# --- GNU tools, installed *alongside* the BSD ones with a g prefix
+# (gsed, gdate, gstat, greadlink, ...). Use them when a Linux script needs GNU
+# flags; don't alias them over the BSD versions.
+brew "coreutils"
+brew "gnu-sed"
+brew "findutils"
+
+# --- containers. Podman on macOS runs a Linux VM: `podman machine init && podman machine start`.
+# If work standardises on Docker Desktop / OrbStack / Colima instead, use that
+# and drop these (and the `docker=podman` alias goes in ~/.bashrc.local).
+brew "podman"
+
+# --- apps
+cask "kitty"
+cask "visual-studio-code"
+cask "google-chrome"
+cask "claude"         # Claude Desktop

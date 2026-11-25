@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Start the Claude Code HTTP hooks server
 
 set -euo pipefail

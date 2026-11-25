@@ -86,7 +86,11 @@ set listchars=tab:»·,trail:·,nbsp:·  " Display tabs and trailing spaces
 " ==============================================================================
 
 set mouse=a                   " Enable mouse in all modes
-set clipboard=unnamedplus     " Use system clipboard
+if has('mac')
+  set clipboard=unnamed       " Use system clipboard (macOS has one, no '+' register)
+else
+  set clipboard=unnamedplus   " Use system clipboard
+endif
 
 " ==============================================================================
 " Performance

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # fedora/bootstrap.sh
 #
 # One-shot setup for a fresh Fedora (Cinnamon spin) install: system updates,

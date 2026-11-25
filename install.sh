@@ -1,12 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Dotfiles installation script
-# Copies dotfiles from this repo to their proper system locations
+# Copies dotfiles from this repo to their proper system locations.
+# Works on Fedora/Linux and macOS (macOS needs Homebrew's bash: the system
+# /bin/bash is 3.2, which has no associative arrays).
 
 set -e
 
+if ((BASH_VERSINFO[0] < 4)); then
+    for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        [[ -x "$b" ]] && exec "$b" "$0" "$@"
+    done
+    echo "install.sh needs bash 4+ (this is $BASH_VERSION). On macOS: brew install bash" >&2
+    exit 1
+fi
+
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/.dotfiles_backup"
+
+OS="$(uname -s)"   # Linux | Darwin
 
 # Files to install (source -> destination)
 declare -A FILES=(
@@ -16,12 +28,19 @@ declare -A FILES=(
     [".gitignore_global"]="$HOME/.gitignore_global"
     [".inputrc"]="$HOME/.inputrc"
     [".vimrc"]="$HOME/.vimrc"
-    ["terminator_config"]="$HOME/.config/terminator/config"
     ["kitty.conf"]="$HOME/.config/kitty/kitty.conf"
-    ["dunst/dunstrc"]="$HOME/.config/dunst/dunstrc"
-    ["vscode/settings.json"]="$HOME/.config/Code/User/settings.json"
     ["claude/format-config.json"]="$HOME/.claude/format-config.json"
 )
+
+if [[ "$OS" == Darwin ]]; then
+    FILES["vscode/settings.json"]="$HOME/Library/Application Support/Code/User/settings.json"
+    # Terminal apps on macOS start login shells, which read ~/.bash_profile, not ~/.bashrc
+    FILES["macos/bash_profile"]="$HOME/.bash_profile"
+else
+    FILES["vscode/settings.json"]="$HOME/.config/Code/User/settings.json"
+    FILES["terminator_config"]="$HOME/.config/terminator/config"
+    FILES["dunst/dunstrc"]="$HOME/.config/dunst/dunstrc"
+fi
 
 # Directories to install (source -> destination)
 declare -A DIRS=(
@@ -188,6 +207,15 @@ done
 
 write_skills_manifest
 
+if [[ "$OS" == Darwin ]]; then
+    # Keychain instead of libsecret for HTTPS git credentials
+    git config --file "$HOME/.gitconfig" credential.helper osxkeychain
+    echo "Set git credential.helper = osxkeychain"
+    # Later kitty settings override earlier ones, so append the macOS overrides
+    cat "$DOTFILES_DIR/macos/kitty.conf" >> "$HOME/.config/kitty/kitty.conf"
+    echo "Appended macos/kitty.conf overrides -> ~/.config/kitty/kitty.conf"
+fi
+
 echo "========================================="
 echo ""
 
@@ -237,9 +265,9 @@ echo ""
 
 echo "Setting up Claude Code hooks server..."
 
-# Install systemd service
-mkdir -p "$(dirname "$HOOKS_SERVICE_DEST")"
-if [[ -f "$DOTFILES_DIR/$HOOKS_SERVICE_SRC" ]]; then
+# Install systemd service (Linux; macOS uses a launchd agent, below)
+if [[ "$OS" != Darwin && -f "$DOTFILES_DIR/$HOOKS_SERVICE_SRC" ]]; then
+    mkdir -p "$(dirname "$HOOKS_SERVICE_DEST")"
     cp "$DOTFILES_DIR/$HOOKS_SERVICE_SRC" "$HOOKS_SERVICE_DEST"
     echo "Installed systemd service -> $HOOKS_SERVICE_DEST"
 fi
@@ -263,8 +291,20 @@ rm -f "$HOME/.claude/hooks/server/security-rules.json"  # moved up to hooks/
 chmod +x "$HOME/.claude/hooks/"*.sh 2>/dev/null || true
 chmod +x "$HOME/.claude/hooks/server/"*.sh 2>/dev/null || true
 
-# Enable and start the systemd service
-if command -v systemctl &>/dev/null; then
+# Enable and start the service
+if [[ "$OS" == Darwin ]]; then
+    # launchd doesn't expand ~ or $HOME, so the plist is rendered with real paths
+    PLIST_LABEL="com.dotfiles.claude-hooks"
+    PLIST_DEST="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
+    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+    sed "s|__HOME__|$HOME|g" "$DOTFILES_DIR/macos/$PLIST_LABEL.plist" > "$PLIST_DEST"
+    echo "Installed launchd agent -> $PLIST_DEST"
+    # bootout + bootstrap (not just kickstart) so plist changes are picked up too
+    launchctl bootout "gui/$(id -u)/$PLIST_LABEL" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST_DEST" && \
+        echo "Started $PLIST_LABEL" || \
+        echo "Note: could not start $PLIST_LABEL (try: claude-hooks start)"
+elif command -v systemctl &>/dev/null; then
     systemctl --user daemon-reload
     systemctl --user enable claude-hooks.service 2>/dev/null && \
         echo "Enabled claude-hooks.service"
@@ -286,4 +326,4 @@ echo ""
 echo "Note: You may need to restart your shell or run 'source ~/.bashrc' for changes to take effect."
 echo ""
 echo "Claude Code hooks dashboard: http://localhost:6271/dashboard"
-echo "Manage hooks server: systemctl --user {start|stop|status} claude-hooks"
+echo "Manage hooks server: claude-hooks {start|stop|restart|status|logs|dashboard}"

@@ -26,6 +26,20 @@ Secrets never go in this repo (it is public): `rclone.conf`, `~/.gitconfig.local
 
 To refresh after changing things on a machine: `code --list-extensions > vscode/extensions.txt`, and re-export Cinnamon settings with `dconf dump /org/cinnamon/` (drop `desktop/background`, `desktop/a11y/applications`, `command-history`, `cursor-theme`).
 
+### New Mac (work laptop)
+
+```bash
+xcode-select --install
+mkdir -p ~/projects && git clone https://github.com/eamon-b/dotfiles.git ~/projects/dotfiles
+~/projects/dotfiles/macos/bootstrap.sh
+```
+
+`macos/bootstrap.sh` is the macOS counterpart of the Fedora script: Homebrew (+ Command Line Tools), `macos/Brewfile`, Homebrew bash 5 as login shell, rustup / nvm / uv / Claude Code, `install.sh`, VS Code extensions, Claude plugins, and `defaults write` tweaks. It must run under the stock `/bin/bash` 3.2, so no bash-4 syntax in it. Personal-machine items (Signal, calibre, syncthing, rclone, tailscale) are deliberately left out. `macos/README.md` is the Linux → macOS guide.
+
+Cross-platform rules: `install.sh` branches on `uname -s`. On Darwin it puts VS Code settings under `~/Library/Application Support/Code/User/`, installs `macos/bash_profile` as `~/.bash_profile`, sets `credential.helper osxkeychain`, appends `macos/kitty.conf` to the installed kitty.conf, and runs the hooks server as the launchd agent `macos/com.dotfiles.claude-hooks.plist` (with `__HOME__` substituted) instead of systemd. It skips terminator and dunst. `install.sh` re-execs itself under Homebrew bash if started by bash 3.2. In `.bashrc`, guard Mac-only code with `((IS_MAC))` and use the `clip` / `open_url` helpers instead of `xclip` / `xdg-open`. Scripts use `#!/usr/bin/env bash` so macOS picks up bash 5 from PATH.
+
+Two GitHub accounts (work + personal) are split by folder: `includeIf "gitdir:"` in `~/.gitconfig.local` sets `user.*` and `core.sshCommand` per folder (`~/work/` vs `~/projects/`; this also applies during `git clone`), and the `.bashrc` `gh` wrapper picks the gh account from `$PWD` when `GH_WORK_USER` / `GH_PERSONAL_USER` are set in `~/.bashrc.local`. The wrapper does nothing unless those are set. Details are in `macos/README.md` §13.
+
 ### Local machine
 
 ```bash
@@ -62,6 +76,7 @@ The sandbox variant skips systemd, the HTTP hooks server, terminator/kitty, and 
   - `skills/` - Custom slash commands
 - **`terminator_config`** - Copied to `~/.config/terminator/config`
 - **`fedora/bootstrap.sh`** - Fresh-install setup (packages, repos, toolchains, services); runs `install.sh`
+- **`macos/`** - `bootstrap.sh` + `Brewfile` (fresh Mac), `bash_profile`, `kitty.conf` overrides, launchd plist for the hooks server, `README.md` (Linux → macOS guide)
 - **`vscode/`** - `settings.json` (copied by `install.sh`) and `extensions.txt` (installed by bootstrap)
 - **`dunst/dunstrc`** - Copied to `~/.config/dunst/dunstrc`
 - **`cinnamon/cinnamon.dconf`** - `dconf load /org/cinnamon/` snapshot (bootstrap only)

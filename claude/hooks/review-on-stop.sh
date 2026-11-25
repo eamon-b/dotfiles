@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Claude Code review-on-stop hook (Stop event, synchronous)
 #
 # When enabled, the first time Claude tries to end a turn that leaves

@@ -1,0 +1,7 @@
+# ~/.bash_profile (macOS)
+#
+# Terminal.app, kitty and VS Code's terminal all start *login* shells on macOS,
+# and a login bash reads ~/.bash_profile, never ~/.bashrc. Everything lives in
+# ~/.bashrc, so just hand over to it.
+
+[[ -f ~/.bashrc ]] && . ~/.bashrc
