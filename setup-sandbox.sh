@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # setup-sandbox.sh
 #
 # Bootstrap dotfiles into a Claude Code cloud sandbox (the env behind claude.ai/code,

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Claude Code notification hook
 # Usage: notify.sh <type> [message]
 # Types: permission, denied, complete
@@ -17,10 +17,31 @@ if [ -n "$PROJECT_NAME" ]; then
     BODY="[$PROJECT_NAME] $MESSAGE"
 fi
 
+IS_MAC=0
+[[ "$(uname -s)" == Darwin ]] && IS_MAC=1
+
 play_sound() {
     local sound="$1"
-    if [ -n "$sound" ] && command -v paplay &>/dev/null && [ -f "$sound" ]; then
+    [ -n "$sound" ] && [ -f "$sound" ] || return 0
+    if command -v paplay &>/dev/null; then
         paplay "$sound" &
+    elif command -v afplay &>/dev/null; then
+        afplay "$sound" &
+    fi
+}
+
+# Map the freedesktop sound names used below to built-in macOS sounds
+sound_for() {
+    if ((IS_MAC)); then
+        case "$1" in
+            warning)  echo /System/Library/Sounds/Funk.aiff ;;
+            complete) echo /System/Library/Sounds/Glass.aiff ;;
+        esac
+    else
+        case "$1" in
+            warning)  echo /usr/share/sounds/freedesktop/stereo/dialog-warning.oga ;;
+            complete) echo /usr/share/sounds/freedesktop/stereo/complete.oga ;;
+        esac
     fi
 }
 
@@ -50,7 +71,18 @@ send_fallback_notification() {
     local title="$2"
     local body="$3"
 
-    notify-send -u "$urgency" -a "Claude Code" "$title" "$body" 2>/dev/null
+    if command -v notify-send &>/dev/null; then
+        notify-send -u "$urgency" -a "Claude Code" "$title" "$body" 2>/dev/null
+    elif command -v terminal-notifier &>/dev/null; then
+        # brew install terminal-notifier: clicking it focuses the terminal
+        terminal-notifier -title "Claude Code" -subtitle "$title" -message "$body" \
+            -group claude-code ${__CFBundleIdentifier:+-activate "$__CFBundleIdentifier"} >/dev/null 2>&1
+    elif command -v osascript &>/dev/null; then
+        # Pass strings as argv so quotes in the message can't break the AppleScript
+        osascript -e 'on run argv' \
+                  -e 'display notification (item 2 of argv) with title "Claude Code" subtitle (item 1 of argv)' \
+                  -e 'end run' "$title" "$body" >/dev/null 2>&1
+    fi
 }
 
 send_notification() {
@@ -70,16 +102,13 @@ send_notification() {
 
 case "$TYPE" in
     permission)
-        send_notification "critical" "Permission Required" "$BODY" \
-            "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+        send_notification "critical" "Permission Required" "$BODY" "$(sound_for warning)"
         ;;
     denied)
-        send_notification "normal" "Action Denied" "$BODY" \
-            "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+        send_notification "normal" "Action Denied" "$BODY" "$(sound_for warning)"
         ;;
     complete)
-        send_notification "normal" "Task Complete" "$BODY" \
-            "/usr/share/sounds/freedesktop/stereo/complete.oga"
+        send_notification "normal" "Task Complete" "$BODY" "$(sound_for complete)"
         ;;
     *)
         send_notification "normal" "Claude Code" "$BODY" ""

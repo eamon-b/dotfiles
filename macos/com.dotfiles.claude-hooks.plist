@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS equivalent of claude/hooks/server/claude-hooks.service.
+  install.sh replaces __HOME__ and copies this to ~/Library/LaunchAgents/.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dotfiles.claude-hooks</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.claude/hooks/server/.venv/bin/python</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>app:app</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>6271</string>
+        <string>--log-level</string>
+        <string>warning</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__HOME__/.claude/hooks/server</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- restart on crash (like Restart=on-failure), but not after a clean exit -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/claude-hooks.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/claude-hooks.log</string>
+</dict>
+</plist>

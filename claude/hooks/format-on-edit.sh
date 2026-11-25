@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Post-edit hook to format code according to ~/.claude/format-config.json
 # Called by Claude Code after Edit tool completes
 
@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Ensure common tool paths are available (newest nvm node, if nvm is installed)
 NVM_NODE_BIN=$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1 || true)
-export PATH="$HOME/.local/bin${NVM_NODE_BIN:+:$NVM_NODE_BIN}:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export PATH="$HOME/.local/bin${NVM_NODE_BIN:+:$NVM_NODE_BIN}:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 CONFIG_FILE="$HOME/.claude/format-config.json"
 LOG_FILE="$HOME/.claude/debug/format-hook.log"

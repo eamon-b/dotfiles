@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SessionStart(compact) hook - re-injects critical context after context
 # window compression.
 #

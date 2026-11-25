@@ -4,6 +4,33 @@
 [[ $- != *i* ]] && return
 
 # ==============================================================================
+# Platform (Linux / macOS)
+# ==============================================================================
+
+IS_MAC=0
+[[ "$OSTYPE" == darwin* ]] && IS_MAC=1
+
+# Homebrew (Apple Silicon: /opt/homebrew, Intel: /usr/local). First, so brew's
+# tools (bash, git, fzf, ...) win over the older ones macOS ships.
+if ((IS_MAC)); then
+    for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [[ -x "$_brew" ]] && { eval "$("$_brew" shellenv)"; break; }
+    done
+    unset _brew
+    export BASH_SILENCE_DEPRECATION_WARNING=1   # "default shell is now zsh" nag
+    export HOMEBREW_NO_ANALYTICS=1
+fi
+
+# Cross-platform helpers
+if ((IS_MAC)); then
+    clip() { pbcopy; }
+    open_url() { open "$@"; }
+else
+    clip() { xclip -selection clipboard; }
+    open_url() { xdg-open "$@" 2>/dev/null; }
+fi
+
+# ==============================================================================
 # History Configuration
 # ==============================================================================
 
@@ -282,7 +309,16 @@ extract() {
 
 # Check permissions along a path (shows full chain from root)
 perm() {
-    namei -l "$(realpath "${1:-.}")"
+    local p
+    p="$(realpath "${1:-.}")"
+    if command -v namei &>/dev/null; then
+        namei -l "$p"
+    else
+        # macOS has no namei: walk up from the target to /
+        local chain=()
+        while :; do chain=("$p" "${chain[@]}"); [[ "$p" == / ]] && break; p="$(dirname "$p")"; done
+        ls -ld "${chain[@]}"
+    fi
 }
 
 # Quick find file
@@ -332,9 +368,9 @@ if command -v bat &>/dev/null; then
             return 1
         fi
         if [[ -n "$2" && -n "$3" ]]; then
-            bat --plain --style=plain -r "$2:$3" "$1" | xclip -selection clipboard
+            bat --plain --style=plain -r "$2:$3" "$1" | clip
         else
-            bat --plain --style=plain "$1" | xclip -selection clipboard
+            bat --plain --style=plain "$1" | clip
         fi
         echo "Copied to clipboard."
     }
@@ -347,6 +383,11 @@ if command -v eza &>/dev/null; then
     alias la='eza -ah --group-directories-first'
     alias lt='eza -lah --sort=modified'
     alias tree='eza --tree'
+elif ((IS_MAC)); then
+    alias ls='ls -G'             # BSD ls: -G is colour, --color is GNU-only
+    alias ll='ls -lFh'
+    alias la='ls -Ah'
+    alias lt='ls -alFth'
 else
     alias ls='ls --color=auto'
     alias ll='ls -lFh'
@@ -415,7 +456,9 @@ fi
 # Bash Completion
 # ==============================================================================
 
-if [[ -f /etc/bash_completion ]]; then
+if [[ -n "${HOMEBREW_PREFIX:-}" && -r "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh" ]]; then
+    . "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh"   # brew install bash-completion@2
+elif [[ -f /etc/bash_completion ]]; then
     . /etc/bash_completion
 elif [[ -f /usr/share/bash-completion/bash_completion ]]; then
     . /usr/share/bash-completion/bash_completion
@@ -429,6 +472,27 @@ if [[ -f ~/.bashrc.local ]]; then
     . ~/.bashrc.local
 fi
 
+# ==============================================================================
+# Two GitHub accounts (work + personal): pick gh's account from the directory
+# ==============================================================================
+# Inert unless ~/.bashrc.local sets GH_WORK_USER and GH_PERSONAL_USER (both
+# logged in with `gh auth login`). Inside GH_WORK_DIR (default ~/work) gh uses
+# the work account, everywhere else the personal one. If the wanted account
+# isn't logged in it refuses rather than falling back to the other.
+# (git itself is handled by includeIf in ~/.gitconfig.local; see macos/README.md)
+if [[ -n "${GH_WORK_USER:-}" && -n "${GH_PERSONAL_USER:-}" ]]; then
+    gh() {
+        [[ "${1:-}" == auth ]] && { command gh "$@"; return; }
+        local user="$GH_PERSONAL_USER" token
+        [[ "$PWD/" == "${GH_WORK_DIR:-$HOME/work}/"* ]] && user="$GH_WORK_USER"
+        token="$(command gh auth token --user "$user" 2>/dev/null)" && [[ -n "$token" ]] || {
+            echo "gh: account '$user' is not logged in (gh auth login)" >&2
+            return 1
+        }
+        GH_TOKEN="$token" command gh "$@"
+    }
+fi
+
 # uv's env file (only exists once uv is installed)
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
@@ -439,9 +503,10 @@ if [[ -d /mnt/data/Android/Sdk ]]; then
     export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
     export PATH=$PATH:$ANDROID_HOME/platform-tools
     export PATH=$PATH:$ANDROID_HOME/emulator
-elif [[ -d ~/Android/Sdk ]]; then
+elif [[ -d ~/Android/Sdk || -d ~/Library/Android/sdk ]]; then
+    # ~/Library/Android/sdk is where Android Studio puts it on macOS
     export ANDROID_AVD_HOME="$HOME/.android/avd"
-    export ANDROID_HOME=~/Android/Sdk
+    if [[ -d ~/Android/Sdk ]]; then export ANDROID_HOME=~/Android/Sdk; else export ANDROID_HOME=~/Library/Android/sdk; fi
     export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
     export PATH=$PATH:$ANDROID_HOME/platform-tools
     export PATH=$PATH:$ANDROID_HOME/emulator
@@ -451,6 +516,10 @@ fi
 # JRE with no javac, which Gradle can't compile with
 if [[ -d /usr/lib/jvm/java-21-openjdk ]]; then
     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+    export PATH=$JAVA_HOME/bin:$PATH
+elif ((IS_MAC)) && /usr/libexec/java_home -v 21 &>/dev/null; then
+    # macOS: /usr/libexec/java_home finds installed JDKs (brew install --cask temurin@21)
+    export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
     export PATH=$JAVA_HOME/bin:$PATH
 fi
 
@@ -468,16 +537,33 @@ claude() {
 
 # Claude Code hooks server management
 claude-hooks() {
+    if ((IS_MAC)); then
+        # launchd agent installed by install.sh (macos/com.dotfiles.claude-hooks.plist)
+        local label="com.dotfiles.claude-hooks"
+        local domain="gui/$(id -u)"
+        local plist="$HOME/Library/LaunchAgents/$label.plist"
+        case "${1:-status}" in
+            start)    launchctl bootstrap "$domain" "$plist" 2>/dev/null || launchctl kickstart "$domain/$label" ;;
+            stop)     launchctl bootout "$domain/$label" ;;
+            restart)  launchctl kickstart -k "$domain/$label" ;;
+            status)   launchctl print "$domain/$label" | grep -E '^\s*(state|pid|last exit code) =' ;;
+            logs)     tail -f "$HOME/Library/Logs/claude-hooks.log" ;;
+        esac
+    else
+        case "${1:-status}" in
+            start)    systemctl --user start claude-hooks ;;
+            stop)     systemctl --user stop claude-hooks ;;
+            restart)  systemctl --user restart claude-hooks ;;
+            status)   systemctl --user status claude-hooks ;;
+            logs)     journalctl --user -u claude-hooks -f ;;
+        esac
+    fi
     case "${1:-status}" in
-        start)    systemctl --user start claude-hooks ;;
-        stop)     systemctl --user stop claude-hooks ;;
-        restart)  systemctl --user restart claude-hooks ;;
-        status)   systemctl --user status claude-hooks ;;
-        logs)     journalctl --user -u claude-hooks -f ;;
+        start|stop|restart|status|logs) ;;
         dashboard)
             local url="http://localhost:${CLAUDE_HOOKS_PORT:-6271}/dashboard"
             echo "Opening $url"
-            xdg-open "$url" 2>/dev/null || echo "Visit: $url"
+            open_url "$url" || echo "Visit: $url"
             ;;
         *)
             echo "Usage: claude-hooks {start|stop|restart|status|logs|dashboard}"
